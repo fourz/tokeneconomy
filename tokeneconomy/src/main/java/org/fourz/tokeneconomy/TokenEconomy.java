@@ -50,6 +50,8 @@ public class TokenEconomy extends JavaPlugin {
             registerCommands();
             registerGriefProtectionHook();
 
+            TokenEconomyAPI.init(this);
+
             getLogger().info("TokenEconomy successfully enabled!");
         } catch (Exception e) {
             getLogger().severe("An error occurred while enabling TokenEconomy: " + e.getMessage());

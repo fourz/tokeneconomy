@@ -162,6 +162,40 @@ public class DataConnector {
         return 0.0;
     }
 
+    public double getPlayerBalanceByUUID(UUID playerUUID) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT BALANCE FROM economy WHERE UUID = ?")) {
+            stmt.setString(1, playerUUID.toString());
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getDouble("BALANCE");
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.warning("Failed to retrieve player balance: " + e.getMessage());
+        }
+        return 0.0;
+    }
+
+    public boolean changePlayerBalance(UUID playerUUID, double amount) {
+        double currentBalance = getPlayerBalanceByUUID(playerUUID);
+        double newBalance = currentBalance + amount;
+        if (newBalance < 0) {
+            return false;
+        }
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "INSERT INTO economy (UUID, BALANCE) VALUES (?, ?) " +
+                "ON CONFLICT(UUID) DO UPDATE SET BALANCE = excluded.BALANCE")) {
+            stmt.setString(1, playerUUID.toString());
+            stmt.setDouble(2, newBalance);
+            stmt.executeUpdate();
+            return true;
+        } catch (SQLException e) {
+            LOGGER.severe("Failed to update player balance: " + e.getMessage());
+            return false;
+        }
+    }
+
     public boolean playerExists(Player player) {
         if (!isConnected()) return false;
         
