@@ -20,10 +20,12 @@ public class DataConnector {
     private final File dbPath;
     private static final Logger LOGGER = Logger.getLogger("TokenEconomy");
     private final Plugin plugin;
+    private final ConfigLoader configLoader;
 
     public DataConnector(Plugin plugin) {
         this.dbPath = new File(plugin.getDataFolder(), "database.db");
         this.plugin = plugin;
+        this.configLoader = ((TokenEconomy)plugin).getConfigLoader();
     }
 
     /**
@@ -46,7 +48,9 @@ public class DataConnector {
     public void setupDatabase() {
         try {
             ensureDataFolderExists();
-            moveOldDatabaseFile();
+            if (configLoader.shouldMigrateOldEconomy()) {
+                moveOldDatabaseFile();
+            }
             initializeDatabaseConnection();
             createEconomyTable();
             LOGGER.info("Database setup successful.");
@@ -73,14 +77,18 @@ public class DataConnector {
         if (oldDbFile.exists()) {
             logOldDatabaseRecordCount(oldDbFile);
             File newDbFile = new File(dbPath.getParentFile(), "database.db");
-            if (oldDbFile.renameTo(newDbFile)) {
-                deleteOldDatabaseFile(oldDbFile);
-                LOGGER.info("Moved existing database file to new location.");
+            if (!newDbFile.exists()) {
+                if (oldDbFile.renameTo(newDbFile)) {
+                    deleteOldDatabaseFile(oldDbFile);
+                    LOGGER.info("Successfully migrated old economy database.");
+                } else {
+                    LOGGER.warning("Failed to migrate old economy database.");
+                }
             } else {
-                LOGGER.warning("Failed to move existing database file.");
+                LOGGER.info("New database already exists, skipping migration.");
             }
         } else {
-            LOGGER.info("No existing database file found.");
+            LOGGER.info("No old economy database found to migrate.");
         }
     }
 

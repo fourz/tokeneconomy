@@ -2,6 +2,7 @@ economy:
   currencyNameSingular: Wizbuck
   currencyNamePlural: Wizbucks
   currencySymbol: WB
+  migrate_old_economy: false
   payCommandInsufficientFundsMessage: "You do not have enough {currencyName} to pay that amount."
   payCommandInvalidAmountMessage: "Invalid amount. Please enter a valid number."
   payCommandInvalidPlayerMessage: "Invalid player. Please enter a valid player name."

@@ -52,7 +52,7 @@ public class BalanceCommand extends BaseCommand implements TabCompleter {
         }
 
         double balance = plugin.getPlayerBalance(targetPlayer);
-        String formattedBalance = CurrencyFormatter.format(balance, plugin);
+        String formattedBalance = CurrencyFormatter.format(balance, plugin, true);
         sender.sendMessage(ChatColor.GREEN + targetPlayer.getName() + "'s balance: " + formattedBalance);
         return true;
     }

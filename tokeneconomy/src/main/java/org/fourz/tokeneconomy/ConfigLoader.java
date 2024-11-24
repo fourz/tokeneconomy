@@ -30,6 +30,10 @@ public class ConfigLoader {
         currencySymbol = config.getString("economy.currencySymbol", "[o]");
     }
 
+    public boolean shouldMigrateOldEconomy() {
+        return plugin.getConfig().getBoolean("economy.migrate_old_economy", false);
+    }
+
     // Retrieves localized messages from config with fallback
     public String getMessage(String path) {
         return plugin.getConfig().getString("economy." + path, "Message not found: " + path);
