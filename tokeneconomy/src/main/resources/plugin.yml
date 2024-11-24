@@ -19,8 +19,12 @@ commands:
   economy:  
     description: Gives or sets an amount from the ether.
     aliases: [eco]
-    usage: /economy give <player> <amount>
-    usage: /economy set <player> <amount>
+    usage: /economy give|set|pay|top <player> [<amount>]
+  top:
+    description: Display the top balances
+    usage: /top
+    aliases: [leaderboard]
+    permission: tokeneconomy.top
 
 permissions:
   tokeneconomy.*:
@@ -38,3 +42,6 @@ permissions:
   tokeneconomy.add:  
     description: Gives the player a certain amount of money from the console
     default: false
+  tokeneconomy.top:
+    description: Allows the player to view the top balances
+    default: true

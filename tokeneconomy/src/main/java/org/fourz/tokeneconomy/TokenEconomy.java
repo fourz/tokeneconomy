@@ -10,13 +10,20 @@ import org.fourz.tokeneconomy.Command.EconomyCommand;
 import org.fourz.tokeneconomy.Command.PayCommand;
 import org.fourz.tokeneconomy.Command.BalanceCommand;
 
+
 import net.milkbowl.vault.economy.Economy;
 
 import org.fourz.tokeneconomy.DataConnector;
 
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.stream.Collectors;
+import java.util.UUID;
+
 public class TokenEconomy extends JavaPlugin {
     private ConfigLoader configLoader;
     private DataConnector dataConnector;
+    private Map<String, Double> playerBalances = new LinkedHashMap<>();
 
     @Override
     public void onEnable() {
@@ -143,5 +150,9 @@ public class TokenEconomy extends JavaPlugin {
 
     public String getDenomination(double amount) {
         return amount == 1 ? currencyNameSingular() : currencyNamePlural();
+    }
+
+    public Map<String, Double> getTopBalances() {
+        return dataConnector.getTopBalances(15); // Default limit of 15
     }
 }

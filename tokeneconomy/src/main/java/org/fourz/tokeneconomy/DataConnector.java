@@ -5,15 +5,21 @@ import org.bukkit.entity.Player;
 import java.sql.*;
 import java.io.File;
 import java.util.logging.Logger;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.LinkedHashMap;
 
 public class DataConnector {
 
     private Connection connection;
     private final File dbPath;
     private static final Logger LOGGER = Logger.getLogger("TokenEconomy");
+    private final Plugin plugin;
 
     public DataConnector(Plugin plugin) {
         this.dbPath = new File(plugin.getDataFolder(), "database.db");
+        this.plugin = plugin;
     }
 
     private boolean isConnected() {
@@ -165,5 +171,28 @@ public class DataConnector {
                 LOGGER.severe("Failed to reset auto-commit: " + e.getMessage());
             }
         }
+    }
+
+    public Map<String, Double> getTopBalances(int limit) {
+        Map<String, Double> topBalances = new LinkedHashMap<>();
+        if (!isConnected()) return topBalances;
+
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT UUID, BALANCE FROM economy ORDER BY BALANCE DESC LIMIT ?")) {
+            stmt.setInt(1, limit);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    UUID uuid = UUID.fromString(rs.getString("UUID"));
+                    double balance = rs.getDouble("BALANCE");
+                    String playerName = plugin.getServer().getOfflinePlayer(uuid).getName();
+                    if (playerName != null) {
+                        topBalances.put(playerName, balance);
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.warning("Failed to retrieve top balances: " + e.getMessage());
+        }
+        return topBalances;
     }
 }

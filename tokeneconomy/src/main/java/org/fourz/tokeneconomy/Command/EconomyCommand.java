@@ -10,7 +10,6 @@ import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.util.CurrencyFormatter;
 import org.bukkit.entity.Player;
 
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Arrays;
@@ -35,6 +34,7 @@ public class EconomyCommand implements CommandExecutor, TabCompleter {
         commands.put("pay", new PayCommand(plugin));
         commands.put("set", new SetCommand(plugin));
         commands.put("add", new AddCommand(plugin));
+        commands.put("top", new TopCommand(plugin));
     }
 
     @Override
