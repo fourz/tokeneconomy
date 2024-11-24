@@ -19,22 +19,26 @@ public class PayCommand extends BaseCommand implements TabCompleter {
 
     @Override
     protected boolean execute(CommandSender sender, String[] args) {
+        // Only players can execute this command, not console
         if (!(sender instanceof Player)) {
             sender.sendMessage(ChatColor.RED + "Only players can use the pay command.");
             return true;
         }
 
+        // Check if player has permission to use pay command
         if (!sender.hasPermission("tokeneconomy.pay")) {
             sender.sendMessage(ChatColor.RED + plugin.getConfigLoader().getMessage("payCommandNoPermissionMessage")
                 .replace("{currencyName}", plugin.getDenomination(0)));
             return true;
         }
 
+        // Validate command syntax
         if (args.length < 2) {
             sender.sendMessage(ChatColor.RED + "Usage: /pay <player> <amount>");
             return true;
         }
 
+        // Ensure target player is online
         Player target = plugin.getServer().getPlayer(args[0]);
         if (target == null) {
             sender.sendMessage(ChatColor.RED + plugin.getConfigLoader().getMessage("payCommandInvalidPlayerMessage"));
@@ -42,6 +46,7 @@ public class PayCommand extends BaseCommand implements TabCompleter {
         }
 
         try {
+            // Validate payment amount is positive
             double amount = Double.parseDouble(args[1]);
             if (amount <= 0) {
                 sender.sendMessage(ChatColor.RED + plugin.getConfigLoader().getMessage("payCommandInvalidAmountMessage"));
@@ -50,11 +55,13 @@ public class PayCommand extends BaseCommand implements TabCompleter {
 
             Player player = (Player) sender;
             
+            // Prevent sending money to self
             if (player.equals(target)) {
                 sender.sendMessage(ChatColor.RED + plugin.getConfigLoader().getMessage("payCommandReceiveMessageSelf"));
                 return true;
             }
 
+            // Check if sender has sufficient funds
             double senderBalance = plugin.getPlayerBalance(player);
             if (senderBalance < amount) {
                 String msg = plugin.getConfigLoader().getMessage("payCommandInsufficientFundsMessage")
@@ -63,10 +70,11 @@ public class PayCommand extends BaseCommand implements TabCompleter {
                 return true;
             }
 
+            // Process the transaction between players
             plugin.getEconomy().withdrawPlayer(player, amount);
             plugin.getEconomy().depositPlayer(target, amount);
 
-            // Send success messages with placeholders
+            // Notify both players about the successful transaction
             String formattedAmount = CurrencyFormatter.format(amount, plugin);
             String successMsg = plugin.getConfigLoader().getMessage("payCommandSuccessMessage")
                 .replace("{amount}", formattedAmount)
@@ -84,6 +92,7 @@ public class PayCommand extends BaseCommand implements TabCompleter {
         return true;
     }
 
+    // Provide tab completion for online player names
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();

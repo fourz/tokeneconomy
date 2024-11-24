@@ -12,29 +12,35 @@ import org.fourz.tokeneconomy.util.CurrencyFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
+// Command handler for setting a player's token balance directly by admins
 public class SetCommand extends BaseCommand implements TabCompleter {
     public SetCommand(TokenEconomy plugin) {
         super(plugin);
     }
 
     @Override
+    // Processes the set command, validates permissions and updates player balance
     public boolean execute(CommandSender sender, String[] args) {
+        // Permission check for admin-only command
         if (!sender.hasPermission("tokeneconomy.set")) {
             sender.sendMessage(ChatColor.RED + "You don't have permission to set player balance.");
             return true;
         }
 
+        // Validate command arguments format
         if (args.length < 2) {
             sender.sendMessage(ChatColor.RED + "Usage: /economy set <player> <amount>");
             return true;
         }
 
+        // Verify target player exists
         Player target = plugin.getServer().getPlayer(args[0]);
         if (target == null) {
             sender.sendMessage(ChatColor.RED + "Player not found.");
             return true;
         }
 
+        // Process balance update and notify players
         try {
             double amount = Double.parseDouble(args[1]);
             plugin.getEconomy().withdrawPlayer(target, plugin.getPlayerBalance(target));
@@ -49,6 +55,7 @@ public class SetCommand extends BaseCommand implements TabCompleter {
     }
 
     @Override
+    // Provides tab completion for player names when using the command
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {

@@ -17,11 +17,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class EconomyCommand implements CommandExecutor, TabCompleter {
+    // Map to handle command aliases for user convenience
     private static final Map<String, String> COMMAND_ALIASES = Map.of(
         "give", "add",
         "transfer", "pay"
     );
 
+    // Main plugin instance and command registry
     private final TokenEconomy plugin;
     private final Map<String, BaseCommand> commands;
 
@@ -29,7 +31,7 @@ public class EconomyCommand implements CommandExecutor, TabCompleter {
         this.plugin = plugin;
         this.commands = new HashMap<>();
         
-        // Register commands
+        // Initialize all available economy subcommands
         commands.put("balance", new BalanceCommand(plugin));
         commands.put("pay", new PayCommand(plugin));
         commands.put("set", new SetCommand(plugin));
@@ -39,14 +41,16 @@ public class EconomyCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        // Default to help command if no arguments provided
         if (args.length == 0) {
             return commands.get("help").execute(sender, args);
         }
 
+        // Process command and resolve aliases
         String subCommand = args[0].toLowerCase();
-        // Resolve alias to actual command
         subCommand = COMMAND_ALIASES.getOrDefault(subCommand, subCommand);
         
+        // Validate command exists and user has permission
         BaseCommand cmd = commands.get(subCommand);
         if (cmd == null) {
             sender.sendMessage(ChatColor.RED + "Unknown command. Use /economy help for available commands");
@@ -58,11 +62,13 @@ public class EconomyCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        // Execute command with remaining arguments
         String[] newArgs = args.length > 1 ? 
             Arrays.copyOfRange(args, 1, args.length) : new String[0];
         return cmd.execute(sender, newArgs);
     }
 
+    // Provide tab completion for commands and player names
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();

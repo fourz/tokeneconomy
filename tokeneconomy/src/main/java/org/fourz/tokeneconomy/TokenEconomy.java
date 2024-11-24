@@ -10,23 +10,20 @@ import org.fourz.tokeneconomy.Command.EconomyCommand;
 import org.fourz.tokeneconomy.Command.PayCommand;
 import org.fourz.tokeneconomy.Command.BalanceCommand;
 
-
 import net.milkbowl.vault.economy.Economy;
-
-import org.fourz.tokeneconomy.DataConnector;
 
 import java.util.Map;
 import java.util.LinkedHashMap;
-import java.util.stream.Collectors;
-import java.util.UUID;
 
 public class TokenEconomy extends JavaPlugin {
+    // These components are separated to maintain single responsibility principle and improve maintainability
     private ConfigLoader configLoader;
     private DataConnector dataConnector;
     private Map<String, Double> playerBalances = new LinkedHashMap<>();
 
     @Override
     public void onEnable() {
+        // Wrapped in try-catch to prevent catastrophic failures and provide detailed error logging for troubleshooting
         try {
             getLogger().info("Initializing TokenEconomy...");
             
@@ -66,6 +63,7 @@ public class TokenEconomy extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // Critical to prevent data loss by ensuring all transactions are saved before shutdown
         try {
             getLogger().info("Disabling TokenEconomy...");
             if (dataConnector != null) {
@@ -88,6 +86,7 @@ public class TokenEconomy extends JavaPlugin {
     // Remove redundant loadConfig() method since it's now handled by ConfigLoader
     
     private boolean setupVault() {
+        // Vault integration is required to provide a standardized economy API that other plugins can use
         Plugin vault = getServer().getPluginManager().getPlugin("Vault");
         if (vault == null || !vault.isEnabled()) {
             return false;
@@ -98,6 +97,7 @@ public class TokenEconomy extends JavaPlugin {
     }
 
     private void registerCommands() {
+        // Null checks prevent NPEs in case commands aren't properly defined in plugin.yml
         if (getCommand("economy") != null) {
             getCommand("economy").setExecutor(new EconomyCommand(this));
         }
@@ -111,6 +111,7 @@ public class TokenEconomy extends JavaPlugin {
     }
 
     private void registerGriefProtectionHook() {
+        // Integrates with GriefPrevention plugin for land claim features
         if (Bukkit.getPluginManager().isPluginEnabled("GriefPrevention")) {
             getLogger().info("GriefPrevention found! Integrating land claim support.");
             // Add GriefPrevention-related hooks here
@@ -119,6 +120,7 @@ public class TokenEconomy extends JavaPlugin {
         }
     }
 
+    // Utility methods for accessing and managing player balances and economy settings
     public double getPlayerBalance(Player player) {
         return dataConnector != null ? dataConnector.getPlayerBalance(player) : 0.0;
     }

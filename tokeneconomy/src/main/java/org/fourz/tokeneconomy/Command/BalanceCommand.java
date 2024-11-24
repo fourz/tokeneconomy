@@ -19,12 +19,13 @@ public class BalanceCommand extends BaseCommand implements TabCompleter {
 
     @Override
     protected boolean execute(CommandSender sender, String[] args) {
+        // Prevent console from checking balance without specifying player
         if (args.length == 0 && !(sender instanceof Player)) {
             sender.sendMessage(ChatColor.RED + "Usage: /economy balance <player>");
             return true;
         }
 
-        // Handle checking own balance
+        // Handle players checking their own balance
         if (args.length == 0) {
             Player player = (Player) sender;
             if (!player.hasPermission("tokeneconomy.balance") && !player.hasPermission("tokeneconomy.balance.*")) {
@@ -37,12 +38,13 @@ public class BalanceCommand extends BaseCommand implements TabCompleter {
             return true;
         }
 
-        // Handle checking other player's balance
+        // Check permissions before allowing to view other player's balance
         if (!sender.hasPermission("tokeneconomy.balance.others") && !sender.hasPermission("tokeneconomy.balance.*")) {
             sender.sendMessage(ChatColor.RED + "You don't have permission to check others' balance.");
             return true;
         }
 
+        // Validate target player exists before showing their balance
         Player targetPlayer = plugin.getServer().getPlayer(args[0]);
         if (targetPlayer == null) {
             sender.sendMessage(ChatColor.RED + "Player not found.");
@@ -57,6 +59,7 @@ public class BalanceCommand extends BaseCommand implements TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        // Provide tab completion suggestions for online player names
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
             List<String> playerNames = new ArrayList<>();

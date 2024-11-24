@@ -10,6 +10,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.LinkedHashMap;
 
+/**
+ * Handles all database operations for the TokenEconomy plugin.
+ * Uses SQLite for persistent storage of player balances.
+ */
 public class DataConnector {
 
     private Connection connection;
@@ -22,6 +26,10 @@ public class DataConnector {
         this.plugin = plugin;
     }
 
+    /**
+     * Verifies if there's an active database connection.
+     * @return true if connection exists and is valid, false otherwise
+     */
     private boolean isConnected() {
         try {
             return connection != null && !connection.isClosed();
@@ -31,6 +39,10 @@ public class DataConnector {
         }
     }
 
+    /**
+     * Initializes the database, creates required tables, and handles migration
+     * from older versions of the plugin if necessary.
+     */
     public void setupDatabase() {
         try {
             ensureDataFolderExists();
@@ -51,6 +63,11 @@ public class DataConnector {
         }
     }
 
+    /**
+     * Attempts to migrate database from old plugin versions to maintain player data.
+     * Old database location: /plugins/economy/database.db
+     * New database location: /plugins/TokenEconomy/database.db
+     */
     private void moveOldDatabaseFile() {
         File oldDbFile = new File(dbPath.getParentFile().getParentFile(), "economy/database.db");
         if (oldDbFile.exists()) {
@@ -85,10 +102,21 @@ public class DataConnector {
         }
     }
 
+    /**
+     * Establishes a new SQLite database connection.
+     * Connection details are stored in the class-level 'connection' field.
+     * @throws SQLException if connection cannot be established
+     */
     private void initializeDatabaseConnection() throws SQLException {
         connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath.getPath());
     }
 
+    /**
+     * Creates the economy table if it doesn't exist.
+     * Table schema:
+     * - UUID: TEXT PRIMARY KEY (player's unique identifier)
+     * - BALANCE: REAL NOT NULL (player's current balance)
+     */
     private void createEconomyTable() throws SQLException {
         try (Statement stmt = connection.createStatement()) {
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS economy (" +
@@ -114,6 +142,11 @@ public class DataConnector {
         }
     }
 
+    /**
+     * Retrieves a player's current balance from the database.
+     * @param player The player whose balance to retrieve
+     * @return The player's balance, or 0.0 if not found or error occurs
+     */
     public double getPlayerBalance(Player player) {
         try (PreparedStatement stmt = connection.prepareStatement(
                 "SELECT BALANCE FROM economy WHERE UUID = ?")) {
@@ -144,6 +177,12 @@ public class DataConnector {
         }
     }
 
+    /**
+     * Updates or inserts a player's balance using UPSERT operation.
+     * Uses transaction to ensure data integrity.
+     * @param player The player whose balance to set
+     * @param balance The new balance value
+     */
     public void setPlayerBalance(Player player, double balance) {
         if (!isConnected()) return;
 
@@ -173,6 +212,12 @@ public class DataConnector {
         }
     }
 
+    /**
+     * Retrieves the top player balances in descending order.
+     * Returns a map of player names to their balances.
+     * @param limit Maximum number of entries to return
+     * @return LinkedHashMap maintaining insertion order of top balances
+     */
     public Map<String, Double> getTopBalances(int limit) {
         Map<String, Double> topBalances = new LinkedHashMap<>();
         if (!isConnected()) return topBalances;
