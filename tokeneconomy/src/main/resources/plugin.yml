@@ -1,0 +1,40 @@
+name: TokenEconomy
+version: 1.0-SNAPSHOT
+api-version: 1.21
+description: This is a simple Bukkit Plugin
+author: fourz
+
+depends: [Vault]
+
+main: org.fourz.tokeneconomy.TokenEconomy
+
+commands:
+  balance:
+    description: Check your balance
+    usage: /balance
+    aliases: [bal,tokens,money]    
+  pay:
+    description: Pay another player
+    usage: /pay <player> <amount>     
+  economy:  
+    description: Gives or sets an amount from the ether.
+    aliases: [eco]
+    usage: /economy give <player> <amount>
+    usage: /economy set <player> <amount>
+
+permissions:
+  tokeneconomy.*:
+    description: Allows the player to use all tokeneconomy commands
+    default: false
+  tokeneconomy.pay:
+    description: Allows the player to pay another player
+    default: false
+  tokeneconomy.balance:
+    description: Allows the player to check their balance
+    default: true
+  tokeneconomy.set:
+    description: Set an player's balance
+    default: false
+  tokeneconomy.add:  
+    description: Gives the player a certain amount of money from the console
+    default: false

@@ -1,0 +1,12 @@
+economy:
+  currencyNameSingular: Wizbuck
+  currencyNamePlural: Wizbucks
+  currencySymbol: WB
+  payCommandInsufficientFundsMessage: "You do not have enough {currencyName} to pay that amount."
+  payCommandInvalidAmountMessage: "Invalid amount. Please enter a valid number."
+  payCommandInvalidPlayerMessage: "Invalid player. Please enter a valid player name."
+  payCommandSuccessMessage: "You have paid {amount} {currencyName} to {player}."
+  payCommandReceiveMessage: "{player} has paid you {amount} {currencyName}."
+  payCommandReceiveMessageOffline: "{player} has paid you {amount} {currencyName} while you were offline."
+  payCommandReceiveMessageSelf: "You cannot pay yourself."
+  payCommandNoPermissionMessage: "{currencyName} are non-transferable between players."
