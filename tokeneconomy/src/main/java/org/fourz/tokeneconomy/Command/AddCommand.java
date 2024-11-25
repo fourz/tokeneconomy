@@ -3,7 +3,7 @@ package org.fourz.tokeneconomy.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.fourz.tokeneconomy.TokenEconomy;
-import org.fourz.tokeneconomy.util.CurrencyFormatter;
+import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 
 public class AddCommand extends BaseCommand {
     public AddCommand(TokenEconomy plugin) {

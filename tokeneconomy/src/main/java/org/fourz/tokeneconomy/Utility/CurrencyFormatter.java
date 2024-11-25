@@ -1,7 +1,8 @@
-package org.fourz.tokeneconomy.util;
+package org.fourz.tokeneconomy.Utility;
 
-import java.lang.foreign.SymbolLookup;
 import java.text.DecimalFormat;
+
+import org.bukkit.ChatColor;
 import org.fourz.tokeneconomy.TokenEconomy;
 
 
@@ -14,11 +15,11 @@ public class CurrencyFormatter {
             plugin.getConfigLoader().getCurrencyNameSingular() :
             plugin.getConfigLoader().getCurrencyNamePlural();
             
-        return DECIMAL_FORMAT.format(amount) + " " + currencyName;
+        return ChatColor.GOLD + DECIMAL_FORMAT.format(amount) + " " + currencyName;
     }
 
     public static String format(double amount, TokenEconomy plugin, boolean useSymbol) {
         String currencySymbol = plugin.getConfigLoader().getCurrencySymbol();            
-        return DECIMAL_FORMAT.format(amount) + " " + currencySymbol;
+        return ChatColor.GOLD + DECIMAL_FORMAT.format(amount) + currencySymbol;
     }
 }

@@ -10,6 +10,17 @@ public class ConfigLoader {
     private String currencyNameSingular;
     private String currencyNamePlural;
     private String currencySymbol;
+    private String storageType;
+    private String mysqlHost;
+    private int mysqlPort;
+    private String mysqlDatabase;
+    private String mysqlUsername;
+    private String mysqlPassword;
+    private String mysqlTablePrefix;
+    private boolean mysqlUseSSL;
+    private int mysqlConnectionTimeout;
+    private int mysqlMaxRetries;
+    private int mysqlRetryDelay;
 
     public ConfigLoader(TokenEconomy plugin) {
         this.plugin = plugin;
@@ -28,6 +39,21 @@ public class ConfigLoader {
         currencyNameSingular = config.getString("economy.currencyNameSingular", "Token");
         currencyNamePlural = config.getString("economy.currencyNamePlural", "Tokens");
         currencySymbol = config.getString("economy.currencySymbol", "[o]");
+        
+        storageType = plugin.getConfig().getString("storage.type", "sqlite").toLowerCase();
+
+        if (storageType.equals("mysql")) {
+            mysqlHost = plugin.getConfig().getString("storage.mysql.host", "localhost");
+            mysqlPort = plugin.getConfig().getInt("storage.mysql.port", 3306);
+            mysqlDatabase = plugin.getConfig().getString("storage.mysql.database", "tokeneconomy");
+            mysqlUsername = plugin.getConfig().getString("storage.mysql.username", "root");
+            mysqlPassword = plugin.getConfig().getString("storage.mysql.password", "");
+            mysqlTablePrefix = plugin.getConfig().getString("storage.mysql.tablePrefix", "tokeneconomy_");
+            mysqlUseSSL = plugin.getConfig().getBoolean("storage.mysql.useSSL", false);
+            mysqlConnectionTimeout = plugin.getConfig().getInt("storage.mysql.connectionTimeout", 5000);
+            mysqlMaxRetries = plugin.getConfig().getInt("storage.mysql.maxRetries", 3);
+            mysqlRetryDelay = plugin.getConfig().getInt("storage.mysql.retryDelay", 2000);            
+        }
     }
 
     public boolean shouldMigrateOldEconomy() {
@@ -50,5 +76,49 @@ public class ConfigLoader {
 
     public String getCurrencySymbol() {
         return currencySymbol;
+    }
+
+    public String getStorageType() {
+        return storageType;
+    }
+
+    public String getMySQLHost() {
+        return mysqlHost;
+    }
+
+    public int getMySQLPort() {
+        return mysqlPort;
+    }
+
+    public String getMySQLDatabase() {
+        return mysqlDatabase;
+    }
+
+    public String getMySQLUsername() {
+        return mysqlUsername;
+    }
+
+    public String getMySQLPassword() {
+        return mysqlPassword;
+    }
+
+    public String getMySQLTablePrefix() {
+        return mysqlTablePrefix;
+    }
+
+    public boolean getMySQLUseSSL() {
+        return mysqlUseSSL;
+    }
+
+    public int getMySQLConnectionTimeout() {
+        return mysqlConnectionTimeout;
+    }
+
+    public int getMySQLMaxRetries() {
+        return mysqlMaxRetries;
+    }
+
+    public int getMySQLRetryDelay() {
+        return mysqlRetryDelay;
     }
 }

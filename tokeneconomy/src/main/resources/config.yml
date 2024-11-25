@@ -1,7 +1,7 @@
-economy:
-  currencyNameSingular: Wizbuck
-  currencyNamePlural: Wizbucks
-  currencySymbol: '[w]'
+economy:  
+  currencyNameSingular: ŵizbuck
+  currencyNamePlural: ŵizbucks
+  currencySymbol: 'ŵ'
   migrate_old_economy: false
   payCommandInsufficientFundsMessage: "You do not have enough {currencyName} to pay that amount."
   payCommandInvalidAmountMessage: "Invalid amount. Please enter a valid number."
@@ -11,3 +11,18 @@ economy:
   payCommandReceiveMessageOffline: "{player} has paid you {amount} {currencyName} while you were offline."
   payCommandReceiveMessageSelf: "You cannot pay yourself."
   payCommandNoPermissionMessage: "{currencyName} are non-transferable between players."
+
+storage:
+  type: sqlite
+  mysql:
+    host: localhost
+    port: 3306
+    username: root
+    password: ''
+    useSSL: false    
+    database: 
+    tablePrefix: tokeneconomy_  
+    connectionTimeout: 5000
+    maxRetries: 3
+    retryDelay: 2000
+  

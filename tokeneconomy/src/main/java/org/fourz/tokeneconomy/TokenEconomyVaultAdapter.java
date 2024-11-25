@@ -7,8 +7,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.bukkit.OfflinePlayer;
-
-import org.fourz.tokeneconomy.util.CurrencyFormatter;
+import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 
 public class TokenEconomyVaultAdapter implements Economy {
 

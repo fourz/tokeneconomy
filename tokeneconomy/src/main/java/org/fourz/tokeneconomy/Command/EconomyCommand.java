@@ -7,7 +7,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.util.StringUtil;
 import org.fourz.tokeneconomy.TokenEconomy;
-import org.fourz.tokeneconomy.util.CurrencyFormatter;
+import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 import org.bukkit.entity.Player;
 
 import java.util.HashMap;
