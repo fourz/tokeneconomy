@@ -37,6 +37,7 @@ public class EconomyCommand implements CommandExecutor, TabCompleter {
         commands.put("set", new SetCommand(plugin));
         commands.put("add", new AddCommand(plugin));
         commands.put("top", new TopCommand(plugin));
+        commands.put("debug", new DebugCommand(plugin));  // Add debug command
     }
 
     @Override

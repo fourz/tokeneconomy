@@ -1,4 +1,4 @@
-package org.fourz.tokeneconomy.DataConnector;
+package org.fourz.tokeneconomy.Data;
 
 import java.io.File;
 import java.sql.*;
@@ -109,6 +109,19 @@ public class SQLiteDataStore implements DataStore {
         }
     }
 
+    public void setPlayerBalance(UUID playerUUID, double balance) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "INSERT INTO economy (UUID, BALANCE) VALUES (?, ?) " +
+                        "ON CONFLICT(UUID) DO UPDATE SET BALANCE = ?")) {
+            stmt.setString(1, playerUUID.toString());
+            stmt.setDouble(2, balance);
+            stmt.setDouble(3, balance);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            LOGGER.warning("Failed to set player balance: " + e.getMessage());
+        }
+    }
+
     public Map<String, Double> getTopBalances(int limit) {
         Map<String, Double> topBalances = new LinkedHashMap<>();
         try (PreparedStatement stmt = connection.prepareStatement(
@@ -123,6 +136,19 @@ public class SQLiteDataStore implements DataStore {
             LOGGER.warning("Failed to retrieve top balances: " + e.getMessage());
         }
         return topBalances;
+    }
+
+    public Map<String, Double> getAllPlayerBalances() {
+        Map<String, Double> balances = new LinkedHashMap<>();
+        try (Statement stmt = connection.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT UUID, BALANCE FROM economy")) {
+            while (rs.next()) {
+                balances.put(rs.getString("UUID"), rs.getDouble("BALANCE"));
+            }
+        } catch (SQLException e) {
+            LOGGER.warning("Failed to retrieve all player balances: " + e.getMessage());
+        }
+        return balances;
     }
 
     public boolean isConnected() throws SQLException {
@@ -189,7 +215,13 @@ public class SQLiteDataStore implements DataStore {
     }
 
     private void initializeDatabaseConnection() throws SQLException {
+        LOGGER.info("Initializing SQLite database connection to " + dbPath.getPath());
         connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath.getPath());
+        if (connection != null && !connection.isClosed()) {
+            LOGGER.info("SQLite database connection established.");
+        } else {
+            throw new SQLException("Failed to establish SQLite database connection.");
+        }
     }
 
     private void createEconomyTable() throws SQLException {

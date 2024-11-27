@@ -8,7 +8,7 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.tokeneconomy.Command.EconomyCommand;
 import org.fourz.tokeneconomy.Command.PayCommand;
-import org.fourz.tokeneconomy.DataConnector.DataConnector;
+import org.fourz.tokeneconomy.Data.DataConnector;
 import org.fourz.tokeneconomy.Command.BalanceCommand;
 
 import net.milkbowl.vault.economy.Economy;
@@ -24,8 +24,8 @@ public class TokenEconomy extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        // Wrapped in try-catch to prevent catastrophic failures and provide detailed error logging for troubleshooting
         try {
+            getLogger().info("Enabling TokenEconomy...");
             getLogger().info("Initializing TokenEconomy...");
             
             // Save default config if it doesn't exist
@@ -66,8 +66,8 @@ public class TokenEconomy extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // Critical to prevent data loss by ensuring all transactions are saved before shutdown
         try {
+            getLogger().info("Disabling TokenEconomy...");
             getLogger().info("Disabling TokenEconomy...");
             if (dataConnector != null) {
                 // Save and close database

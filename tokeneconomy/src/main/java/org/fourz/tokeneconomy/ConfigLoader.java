@@ -21,6 +21,9 @@ public class ConfigLoader {
     private int mysqlConnectionTimeout;
     private int mysqlMaxRetries;
     private int mysqlRetryDelay;
+    private boolean migrateFromMySQL;
+    private boolean migrateFromSQLite;
+    private String migrationStatus; // "none", "in_progress", "completed", "failed"
 
     public ConfigLoader(TokenEconomy plugin) {
         this.plugin = plugin;
@@ -40,19 +43,32 @@ public class ConfigLoader {
         currencyNamePlural = config.getString("economy.currencyNamePlural", "Tokens");
         currencySymbol = config.getString("economy.currencySymbol", "[o]");
         
-        storageType = plugin.getConfig().getString("storage.type", "sqlite").toLowerCase();
+        storageType = config.getString("storage.type", "sqlite").toLowerCase();
+        migrateFromMySQL = config.getBoolean("storage.migrate_from_mysql", false);
+        migrateFromSQLite = config.getBoolean("storage.migrate_from_sqlite", false);
+        migrationStatus = config.getString("storage.migration_status", "none");
+        if (!migrationStatus.matches("none|in_progress|completed|failed")) {
+            migrationStatus = "none";
+            config.set("storage.migration_status", "none");
+            plugin.saveConfig();
+        }
 
         if (storageType.equals("mysql")) {
-            mysqlHost = plugin.getConfig().getString("storage.mysql.host", "localhost");
-            mysqlPort = plugin.getConfig().getInt("storage.mysql.port", 3306);
-            mysqlDatabase = plugin.getConfig().getString("storage.mysql.database", "tokeneconomy");
-            mysqlUsername = plugin.getConfig().getString("storage.mysql.username", "root");
-            mysqlPassword = plugin.getConfig().getString("storage.mysql.password", "");
-            mysqlTablePrefix = plugin.getConfig().getString("storage.mysql.tablePrefix", "tokeneconomy_");
-            mysqlUseSSL = plugin.getConfig().getBoolean("storage.mysql.useSSL", false);
-            mysqlConnectionTimeout = plugin.getConfig().getInt("storage.mysql.connectionTimeout", 5000);
-            mysqlMaxRetries = plugin.getConfig().getInt("storage.mysql.maxRetries", 3);
-            mysqlRetryDelay = plugin.getConfig().getInt("storage.mysql.retryDelay", 2000);            
+            mysqlHost = config.getString("storage.mysql.host");
+            mysqlPort = config.getInt("storage.mysql.port", 3306);
+            mysqlDatabase = config.getString("storage.mysql.database");
+            mysqlUsername = config.getString("storage.mysql.username");
+            mysqlPassword = config.getString("storage.mysql.password", "");
+            mysqlTablePrefix = config.getString("storage.mysql.tablePrefix", "tokeneconomy_");
+            mysqlUseSSL = config.getBoolean("storage.mysql.useSSL", false);
+            mysqlConnectionTimeout = config.getInt("storage.mysql.connectionTimeout", 5000);
+            mysqlMaxRetries = config.getInt("storage.mysql.maxRetries", 3);
+            mysqlRetryDelay = config.getInt("storage.mysql.retryDelay", 2000);
+            
+            // Log MySQL configuration (excluding sensitive data)
+            plugin.getLogger().info(String.format(
+                "MySQL Configuration: host=%s, port=%d, database=%s, useSSL=%s", 
+                mysqlHost, mysqlPort, mysqlDatabase, mysqlUseSSL));
         }
     }
 
@@ -120,5 +136,23 @@ public class ConfigLoader {
 
     public int getMySQLRetryDelay() {
         return mysqlRetryDelay;
+    }
+
+    public boolean shouldMigrateFromMySQL() {
+        return migrateFromMySQL;
+    }
+
+    public boolean shouldMigrateFromSQLite() {
+        return migrateFromSQLite;
+    }
+
+    public String getMigrationStatus() {
+        return migrationStatus;
+    }
+
+    public void setMigrationStatus(String status) {
+        migrationStatus = status;
+        plugin.getConfig().set("storage.migration_status", status);
+        plugin.saveConfig();
     }
 }

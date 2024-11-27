@@ -1,4 +1,4 @@
-package org.fourz.tokeneconomy.DataConnector;
+package org.fourz.tokeneconomy.Data;
 
 import java.sql.*;
 import java.util.LinkedHashMap;
@@ -40,12 +40,15 @@ public class MySQLDataStore implements DataStore {
 
     public void setupDatabase() {
         try {
-            initializeDatabaseConnection();
+            if (connection == null || connection.isClosed()) {
+                initializeDatabaseConnection();
+            }
             createEconomyTable();
             LOGGER.info("MySQL database setup successful.");
         } catch (SQLException e) {
             LOGGER.severe("MySQL database setup failed: " + e.getMessage());
             e.printStackTrace();
+            throw new RuntimeException("Failed to setup MySQL database", e);
         }
     }
 
@@ -115,6 +118,42 @@ public class MySQLDataStore implements DataStore {
         }
     }
 
+    public void setPlayerBalance(UUID playerUUID, double balance) {
+        try {
+            ensureConnected();
+            try (PreparedStatement stmt = connection.prepareStatement(
+                    "INSERT INTO " + tablePrefix + "economy (UUID, BALANCE) VALUES (?, ?) " +
+                            "ON DUPLICATE KEY UPDATE BALANCE = ?")) {
+                stmt.setString(1, playerUUID.toString());
+                stmt.setDouble(2, balance);
+                stmt.setDouble(3, balance);
+                stmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            LOGGER.severe("Failed to set player balance: " + e.getMessage());
+            throw new RuntimeException("Failed to set balance", e);
+        }
+    }
+
+    public Map<String, Double> getAllPlayerBalances() {
+        Map<String, Double> balances = new LinkedHashMap<>();
+        try {
+            ensureConnected();
+            try (PreparedStatement stmt = connection.prepareStatement(
+                    "SELECT UUID, BALANCE FROM " + tablePrefix + "economy")) {
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        balances.put(rs.getString("UUID"), rs.getDouble("BALANCE"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            LOGGER.warning("Failed to retrieve all player balances: " + e.getMessage());
+            throw new RuntimeException("Failed to retrieve balances", e);
+        }
+        return balances;
+    }
+
     public Map<String, Double> getTopBalances(int limit) {
         Map<String, Double> topBalances = new LinkedHashMap<>();
         try (PreparedStatement stmt = connection.prepareStatement(
@@ -158,50 +197,37 @@ public class MySQLDataStore implements DataStore {
 
     // Private helper methods
     private void initializeDatabaseConnection() throws SQLException {
+        // Validate configuration
+        validateConfiguration();
+            
         int attempts = 0;
-        String url = "jdbc:mysql://" + host + ":" + port + "/" + database 
-            + "?useSSL=" + useSSL
-            + "&connectTimeout=" + connectionTimeout
-            + "&socketTimeout=" + connectionTimeout
-            + "&autoReconnect=true"
-            + "&serverTimezone=UTC";
+        String url = buildConnectionUrl();
             
         // Log connection attempt (without sensitive data)
-        LOGGER.info("Attempting MySQL connection to " + host + ":" + port + "/" + database);
+        LOGGER.info(String.format("Attempting MySQL connection to %s:%d/%s (SSL: %s, Timeout: %d)", 
+            host, port, database, useSSL, connectionTimeout));
 
+        SQLException lastException = null;
         while (attempts < maxRetries) {
             try {
                 connection = DriverManager.getConnection(url, username, password);
                 
-                // Test the connection explicitly
                 if (connection.isValid(connectionTimeout)) {
-                    LOGGER.info("Successfully connected to MySQL database");
+                    LOGGER.info("Successfully connected to MySQL database.");
                     return;
                 } else {
-                    throw new SQLException("Connection created but failed validity check");
+                    throw new SQLException("Connection created but failed validity check.");
                 }
             } catch (SQLException e) {
+                lastException = e;
                 attempts++;
-                StringBuilder errorMsg = new StringBuilder();
-                errorMsg.append("Failed to connect to MySQL (attempt ").append(attempts)
-                       .append("/").append(maxRetries).append("): ")
-                       .append(e.getMessage());
-
-                // Get root cause
-                Throwable rootCause = e;
-                while (rootCause.getCause() != null) {
-                    rootCause = rootCause.getCause();
-                    errorMsg.append("\nCaused by: ").append(rootCause.getMessage());
-                }
-
-                if (attempts >= maxRetries) {
-                    LOGGER.severe(errorMsg.toString());
-                    throw new SQLException("Failed to connect to MySQL after " + maxRetries 
-                        + " attempts. Last error: " + errorMsg.toString(), e);
-                }
-
-                LOGGER.warning(errorMsg.toString());
+                String errorMsg = String.format("Failed to connect to MySQL (attempt %d/%d): %s", 
+                    attempts, maxRetries, e.getMessage());
+                LOGGER.warning(errorMsg);
                 
+                if (attempts >= maxRetries) {
+                    break;
+                }
                 try {
                     Thread.sleep(retryDelay);
                 } catch (InterruptedException ie) {
@@ -210,6 +236,47 @@ public class MySQLDataStore implements DataStore {
                 }
             }
         }
+        
+        String errorMessage = String.format(
+            "Failed to connect to MySQL after %d attempts. Last error: %s. " +
+            "Please check your MySQL configuration in config.yml", 
+            maxRetries, 
+            lastException != null ? lastException.getMessage() : "Unknown error"
+        );
+        throw new SQLException(errorMessage, lastException);
+    }
+
+    private void validateConfiguration() throws SQLException {
+        StringBuilder errors = new StringBuilder();
+        
+        if (database == null || database.trim().isEmpty()) {
+            errors.append("Database name is not configured. ");
+        }
+        if (host == null || host.trim().isEmpty()) {
+            errors.append("Host is not configured. ");
+        }
+        if (port <= 0 || port > 65535) {
+            errors.append("Invalid port number (must be between 1 and 65535). ");
+        }
+        if (username == null || username.trim().isEmpty()) {
+            errors.append("Username is not configured. ");
+        }
+        // Note: Password can be empty in some configurations
+        
+        if (errors.length() > 0) {
+            throw new SQLException("Invalid MySQL configuration: " + errors.toString() + 
+                "Please check your storage.mysql settings in config.yml");
+        }
+    }
+
+    private String buildConnectionUrl() {
+        return String.format("jdbc:mysql://%s:%d/%s?useSSL=%s" +
+            "&connectTimeout=%d" +
+            "&socketTimeout=%d" +
+            "&autoReconnect=true" +
+            "&serverTimezone=UTC",
+            host, port, database, useSSL,
+            connectionTimeout, connectionTimeout);
     }
 
     private void createEconomyTable() throws SQLException {
@@ -220,6 +287,16 @@ public class MySQLDataStore implements DataStore {
                 ")";
         try (Statement stmt = connection.createStatement()) {
             stmt.executeUpdate(createTableSQL);
+        }
+    }
+
+    private void ensureConnected() throws SQLException {
+        if (connection == null || connection.isClosed()) {
+            initializeDatabaseConnection();
+        }
+        if (!connection.isValid(connectionTimeout)) {
+            LOGGER.warning("MySQL connection lost, attempting reconnection...");
+            initializeDatabaseConnection();
         }
     }
 }

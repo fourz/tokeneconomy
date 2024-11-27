@@ -14,6 +14,9 @@ economy:
 
 storage:
   type: sqlite
+  migrate_from_mysql: false
+  migrate_from_sqlite: false
+  migration_status: none
   mysql:
     host: localhost
     port: 3306
@@ -25,4 +28,3 @@ storage:
     connectionTimeout: 5000
     maxRetries: 3
     retryDelay: 2000
-  
