@@ -1,0 +1,214 @@
+# TokenEconomy Copilot Instructions
+
+These guidelines should be followed when modifying or creating code to maintain consistency throughout the TokenEconomy plugin codebase using documentation files as references.
+
+## General Directive
+
+- **Focus on economy-related functionality and maintain compatibility with Vault API**
+- **Ensure thread safety for all database operations**
+- **Follow the established DataStore pattern for storage abstraction**
+
+## Commenting Guidelines
+
+### JavaDoc Comments
+
+#### Class Documentation
+
+- Explain the class's purpose and responsibility in the economy system
+- Note important design patterns or architectural decisions
+- Focus on "why" over implementation details
+
+```java
+/**
+ * Manages player balance storage and retrieval with multiple backend support.
+ * Provides abstraction layer between economy operations and data persistence.
+ */
+```
+
+#### Method Documentation
+
+- Describe purpose and behavior, not implementation
+- Document parameters and return values
+- Note exceptions that may be thrown
+- Include examples for complex methods
+
+```java
+/**
+ * Retrieves player balance from the configured storage backend.
+ * Handles fallback behavior when player data isn't available.
+ *
+ * @param player The player whose balance to retrieve
+ * @return The player's current balance or 0.0 if not found
+ * @throws SQLException If database connection fails
+ */
+```
+
+### Code Comments
+
+- Comment on "why" less "what" - explain reasoning behind code
+- Place comments above the code they describe
+- Keep comments concise and meaningful
+- Use TODO and FIXME sparingly and with clear descriptions
+- Explain complex logic, business rules, or non-obvious decisions
+
+## Message Formatting Standards
+
+### Player-Facing Messages
+
+Use these standardized message prefixes with ChatColor formatting:
+
+- `ChatColor.RED + "Usage: "` for usage instructions and command help
+- `ChatColor.YELLOW + "Processing..."` for operations in progress
+- `ChatColor.GREEN + "Success: "` for success messages
+- `ChatColor.RED + "Error: "` for error messages
+- `ChatColor.GOLD + "Warning: "` for warnings
+- `ChatColor.GRAY + "   "` for additional information or tips (three spaces)
+
+### Console and Debug Messages
+
+- Use the Java Logger for all console output
+- **Do not use color codes in console messages**
+- Create clear, concise messages that explain the context
+- For errors, include actionable information to help troubleshoot
+- Use appropriate log levels (INFO, WARNING, SEVERE)
+
+## Logging Standards
+
+- Use the plugin's `getLogger()` method for all logging in plugin code
+- Always declare logger access through the plugin instance
+- Use `plugin.getLogger().info(message)`, `plugin.getLogger().warning(message)`, and `plugin.getLogger().severe(message)` for logging
+- Do not use `System.out.println()` or custom logger fields
+- Include context information in log messages for debugging
+
+**Example:**
+
+```java
+public class EconomyCommand implements CommandExecutor {
+    private final TokenEconomy plugin;
+
+    public EconomyCommand(TokenEconomy plugin) {
+        this.plugin = plugin;
+    }
+
+    public void someMethod() {
+        plugin.getLogger().info("Economy command executed successfully");
+        plugin.getLogger().warning("Player balance may be inconsistent");
+        plugin.getLogger().severe("Database connection failed: " + exception.getMessage());
+    }
+}
+```
+
+## Database Architecture Guidelines
+
+See the detailed documentation in [Database Architecture](../docs/tokeneconomy-database-architecture.md).
+
+Key principles:
+
+- DataConnector as central hub for database operations
+- DataStore interface for storage backend abstraction
+- Prepared statements for all SQL operations
+- Connection pooling and retry mechanisms for MySQL
+- Transaction integrity with proper error handling
+
+## Code Structure Best Practices
+
+### Command Implementation
+
+See the detailed documentation in [Command Structure](../docs/tokeneconomy-command-structure.md).
+
+Key principles:
+
+- Extend BaseCommand for consistent command behavior
+- Use permission checks before command execution
+- Provide clear error messages for invalid input
+- Format currency amounts consistently using CurrencyFormatter
+- Handle offline players appropriately
+
+### Data Storage
+
+- Use the DataStore interface for all database operations
+- Implement proper connection handling and cleanup
+- Use UUID-based player identification for consistency
+- Handle database migration between storage types
+- Implement caching for frequently accessed data
+
+### API Integration
+
+- Maintain full Vault compatibility
+- Implement TokenEconomyAPI for third-party integration
+- Use async operations for database-heavy tasks
+- Provide clear API documentation and examples
+
+## Performance Considerations
+
+See the detailed documentation in [Performance Considerations](../docs/tokeneconomy-performance-considerations.md).
+
+Key principles:
+
+- Use prepared statements for all database queries
+- Implement connection pooling for MySQL backends
+- Cache frequently accessed configuration values
+- Use async operations for database-intensive tasks
+- Monitor database connection health and retry failed operations
+
+## Development Workflow
+
+### Building and Testing
+
+To build and test the plugin, use one of the following methods:
+
+- **Build Plugin**
+  - Use the `Build Plugin` task to compile and package the plugin JAR
+
+- **Reload Server**:
+  - Use the `Reload Server` task to build, copy and reload the plugin without restarting the server
+
+- **Restart Server**:
+  - Use the `Restart Server` task to build, copy and fully restart the server for testing major changes
+
+These tasks can be executed from the VS Code task runner or directly from the terminal using the provided PowerShell scripts.
+
+### Currency Formatting
+
+- Always use `CurrencyFormatter.format()` for displaying currency amounts
+- Support both singular and plural currency names
+- Use currency symbols when appropriate
+- Maintain consistent decimal formatting across all displays
+
+### Vault Integration
+
+- Ensure all Vault Economy methods are properly implemented
+- Test compatibility with other economy-dependent plugins
+- Handle edge cases like negative balances and maximum limits
+- Provide meaningful error messages for Vault operations
+
+## Documentation Reference
+
+### Context Window Include Directive
+
+- **Only include linked documentation files if relevant to current task or question.**
+- **Limit included files to those that directly relate to the task at hand.**
+- **Search documentation for TokenEconomy-specific implementation details.**
+
+### TokenEconomy Project Information
+
+- [README](../README.md)
+- [ROADMAP](../ROADMAP.md)
+
+### Architecture & Design
+
+- [Database Architecture](../docs/tokeneconomy-database-architecture.md)
+- [Command Structure](../docs/tokeneconomy-command-structure.md)
+- [Performance Considerations](../docs/tokeneconomy-performance-considerations.md)
+- [API Documentation](../docs/tokeneconomy-api-documentation.md)
+- [Configuration Guide](../docs/tokeneconomy-configuration-guide.md)
+- [Storage Backends](../docs/tokeneconomy-storage-backends.md)
+- [Vault Integration](../docs/tokeneconomy-vault-integration.md)
+- [Migration Guide](../docs/tokeneconomy-migration-guide.md)
+
+### Development Resources
+
+- [Contributing Guidelines](../docs/CONTRIBUTING.md)
+- [Testing Guide](../docs/tokeneconomy-testing-guide.md)
+- [Troubleshooting](../docs/tokeneconomy-troubleshooting.md)
+- [Plugin Compatibility](../docs/tokeneconomy-plugin-compatibility.md)
