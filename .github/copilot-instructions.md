@@ -1,368 +1,39 @@
-# TokenEconomy Copilot Instructions with Metamake
+# TokenEconomy Copilot Instructions
 
-> **AI Assistant Guide for Minecraft Plugin Development Organization & Project Management with Metamake Tools**
+**Parent Hub**: See Ravenkraft-Dev CLAUDE.md for complete ecosystem standards.
 
-These instructions guide GitHub Copilot in assisting with the organization, documentation, and project management of the TokenEconomy environment, with explicit support for the embedded metamake project management system.
+## Tool Discovery
 
-## 🤖 AI Assistant Role
+**Server Management**: `mcp_rvnkdev-minec_*` tools (console, files, state, db)
+**Live Testing**: `/rvnktest [health|services|db|plugins|run all]`
+**Agents**: Browse `.claude/agents/` for specialized workflows
+**Skills**: Browse `.claude/skills/` for domain capabilities
+**Rules Import**: Use `@import ../../.claude/rules/<rule>.md` for shared directives
 
-When working with this project, Copilot serves as a guide to assist with organizing Minecraft Plugin Development by understanding this is a Java/Maven/Spigot environment with:
+## Archon Integration
 
-- **Minecraft Spigot/Paper server plugin architecture**
-- **SQLite and MySQL database backends for player economy data**
-- **Vault API integration for cross-plugin compatibility**
-- **Maven build system with modern Java 17 LTS support**
+**Board**: `d4e5f6a7-8901-bcde-f234-567890123456` (TokenEconomy)
+**Workflow**: `find_tasks()` → `manage_task("update", status="doing")` → implement → `status="done"`
 
-## 📂 Project Organization Structure
+## Plugin-Specific Standards
 
-Copilot should understand and assist with the following organizational structure:
+### Economy Design
+- Fiat currency for vote reward tokens only (not player exchange)
+- Server-provided services, not player-to-player trading
+- Integration with BarterShops for optional token payments
 
-### Project Management
-- **ROADMAP.md** - Tracks project status, next steps, and future implementations
-- **docs/project-plans/** - Contains detailed project plans and specifications
-- **README.md** - Project overview and quick start guide
+### Services (via RVNKCore)
+- `ITokenService` for token management
+- `IEconomyService` for economy operations
+- Optional Vault bridge for external economy plugins
 
-### Documentation
-- **docs/tokeneconomy-resource-inventory.md** - Complete resource inventory (reference only, detailed data lives here)
-- **docs/components/** - Component-specific documentation and configurations
-- **docs/architecture/** - Detailed system architecture and design
+### Message Prefixes
+- `&c▶` usage | `&6⚙` progress | `&a✓` success | `&c✖` error | `&e⚠` warning
 
-### Automation & Scripts
-- **.vscode/** - Script output location for install/setup/maintenance
-  - Keep archive of all automation scripts
-  - Organize by development workflow (build, deploy, test, server management)
-  - Include PowerShell scripts for Maven builds and server automation
+### Logging
+Use `LogManager.getInstance(plugin, "ClassName")` from RVNKCore.
 
-### Metamake Project Management
-- **tokeneconomy/metamake/README.md** - Embedded metamake project documentation
-- **tokeneconomy/metamake/.github/copilot-instructions.md** - Use ONLY while using metamake tool usage
-- **tokeneconomy/metamake/projects/** - Structured project management with metamake templates
+## References
 
-## 🎯 Assistance Objectives
-
-Copilot should assist with:
-
-1. **Project Organization**
-   - Maintaining consistent project structure
-   - Suggesting appropriate file locations
-   - Helping organize documentation by category
-   - **Using metamake for structured project management**
-
-2. **Documentation Management**
-   - Tracking updates across API documentation, command structure, database architecture, and configuration guides
-   - Maintaining consistent naming conventions
-   - Suggesting documentation improvements
-
-3. **Project Planning**
-   - Updating ROADMAP.md with progress and milestones
-   - Creating new project plans in docs/project-plans/
-   - **Using metamake templates for project scaffolding**
-   - Identifying dependencies between projects
-
-4. **Plugin Development Management**
-   - Managing economy command implementations and API integrations
-   - Database migration planning and storage backend optimization
-   - Vault compatibility testing and cross-plugin integration validation
-
-## 🔧 Metamake Integration
-
-### When to Use Metamake
-Use the embedded metamake system for:
-- Creating new structured projects
-- Project scaffolding and templating
-- Complex project management workflows
-- Multi-phase project planning
-
-### Metamake Context Switching
-- **When using metamake tools**: Follow guidance in `tokeneconomy/metamake/.github/copilot-instructions.md`
-- **For general Minecraft Plugin Development organization**: Follow these instructions
-- **Project creation**: Use metamake templates in `tokeneconomy/metamake/projects/`
-
-### Metamake Project Structure
-Each metamake project includes:
-- `project-details.md` - Comprehensive project specification
-- `README.md` - Project overview and status
-- `ROADMAP.md` - Project-specific timeline
-- `docs/` - Project documentation
-- `features/` - Feature specifications
-- `implementation/` - Implementation details
-- `validation/` - Testing and validation criteria
-
-## 📝 Formatting Guidelines
-
-Maintain consistent documentation format:
-
-- **Java Classes**: Use PascalCase (e.g., `TokenEconomy`, `DataConnector`)
-- **Package Names**: Use lowercase with dots (e.g., `org.fourz.tokeneconomy.command`)
-- **Configuration Keys**: Use snake_case (e.g., `currency_name_singular`)
-- **References**: Use relative paths from repository root
-- **Metamake Projects**: Follow metamake naming conventions and structure
-
-## 🔍 Domain Knowledge
-
-### Java/Maven/Spigot Development
-- Spigot API integration patterns and Bukkit event handling
-- Maven dependency management and plugin lifecycle
-- Java 17 LTS features and performance optimization
-- Plugin.yml configuration and permissions system
-
-### Database Architecture
-- SQLite vs MySQL storage backend selection criteria
-- Connection pooling and transaction management
-- Database migration patterns between storage types
-- Prepared statement usage for security and performance
-
-### Minecraft Economy Systems
-- Vault Economy API implementation requirements
-- Player balance management and transaction integrity
-- Cross-plugin compatibility and integration testing
-- Economy command structure and user experience patterns
-
-## 🔄 Documentation Workflow
-
-When assisting with documentation:
-
-1. **Always reference docs/tokeneconomy-resource-inventory.md** for current resource data
-2. **Update ROADMAP.md** when project status changes
-3. **Create project plans** in docs/project-plans/ for simple projects
-4. **Use metamake** for complex, multi-phase projects
-5. **Document components** in docs/components/ for specific configurations
-6. **Track scripts** in .vscode/ with appropriate naming and archiving
-
-### Metamake Workflow
-For structured projects:
-1. **Use metamake templates** from `tokeneconomy/metamake/projects/`
-2. **Follow metamake instructions** in `tokeneconomy/metamake/.github/copilot-instructions.md`
-3. **Create comprehensive project plans** using metamake structure
-4. **Track progress** through metamake project phases
-
-## 🛠️ Technical Considerations
-
-- Recognize references to specific command classes and data storage components
-- Understand the Minecraft server plugin environment
-- Consider the multi-backend database architecture in recommendations
-- Be aware of Vault API and cross-plugin dependencies
-- Suggest PowerShell scripts for Java/Maven automation tasks
-- **Leverage metamake for complex project management**
-
-## ⚠️ Important Notes
-
-- All sensitive information should be documented generically
-- Focus on technical documentation rather than personal data
-- Prioritize accuracy in API documentation, database schemas, and configuration guides
-- Maintain consistent terminology across all documentation
-- Keep project organization clean and logical
-- **Switch to metamake context when using metamake tools**
-- Use metamake for structured project management and templates
-
-## General Directive (Legacy TokenEconomy Guidelines)
-
-- **Focus on economy-related functionality and maintain compatibility with Vault API**
-- **Ensure thread safety for all database operations**
-- **Follow the established DataStore pattern for storage abstraction**
-
-## Commenting Guidelines
-
-### JavaDoc Comments
-
-#### Class Documentation
-
-- Explain the class's purpose and responsibility in the economy system
-- Note important design patterns or architectural decisions
-- Focus on "why" over implementation details
-
-```java
-/**
- * Manages player balance storage and retrieval with multiple backend support.
- * Provides abstraction layer between economy operations and data persistence.
- */
-```
-
-#### Method Documentation
-
-- Describe purpose and behavior, not implementation
-- Document parameters and return values
-- Note exceptions that may be thrown
-- Include examples for complex methods
-
-```java
-/**
- * Retrieves player balance from the configured storage backend.
- * Handles fallback behavior when player data isn't available.
- *
- * @param player The player whose balance to retrieve
- * @return The player's current balance or 0.0 if not found
- * @throws SQLException If database connection fails
- */
-```
-
-### Code Comments
-
-- Comment on "why" less "what" - explain reasoning behind code
-- Place comments above the code they describe
-- Keep comments concise and meaningful
-- Use TODO and FIXME sparingly and with clear descriptions
-- Explain complex logic, business rules, or non-obvious decisions
-
-## Message Formatting Standards
-
-### Player-Facing Messages
-
-Use these standardized message prefixes with ChatColor formatting:
-
-- `ChatColor.RED + "Usage: "` for usage instructions and command help
-- `ChatColor.YELLOW + "Processing..."` for operations in progress
-- `ChatColor.GREEN + "Success: "` for success messages
-- `ChatColor.RED + "Error: "` for error messages
-- `ChatColor.GOLD + "Warning: "` for warnings
-- `ChatColor.GRAY + "   "` for additional information or tips (three spaces)
-
-### Console and Debug Messages
-
-- Use the Java Logger for all console output
-- **Do not use color codes in console messages**
-- Create clear, concise messages that explain the context
-- For errors, include actionable information to help troubleshoot
-- Use appropriate log levels (INFO, WARNING, SEVERE)
-
-## Logging Standards
-
-- Use the plugin's `getLogger()` method for all logging in plugin code
-- Always declare logger access through the plugin instance
-- Use `plugin.getLogger().info(message)`, `plugin.getLogger().warning(message)`, and `plugin.getLogger().severe(message)` for logging
-- Do not use `System.out.println()` or custom logger fields
-- Include context information in log messages for debugging
-
-**Example:**
-
-```java
-public class EconomyCommand implements CommandExecutor {
-    private final TokenEconomy plugin;
-
-    public EconomyCommand(TokenEconomy plugin) {
-        this.plugin = plugin;
-    }
-
-    public void someMethod() {
-        plugin.getLogger().info("Economy command executed successfully");
-        plugin.getLogger().warning("Player balance may be inconsistent");
-        plugin.getLogger().severe("Database connection failed: " + exception.getMessage());
-    }
-}
-```
-
-## Database Architecture Guidelines
-
-See the detailed documentation in [Database Architecture](../docs/tokeneconomy-database-architecture.md).
-
-Key principles:
-
-- DataConnector as central hub for database operations
-- DataStore interface for storage backend abstraction
-- Prepared statements for all SQL operations
-- Connection pooling and retry mechanisms for MySQL
-- Transaction integrity with proper error handling
-
-## Code Structure Best Practices
-
-### Command Implementation
-
-See the detailed documentation in [Command Structure](../docs/tokeneconomy-command-structure.md).
-
-Key principles:
-
-- Extend BaseCommand for consistent command behavior
-- Use permission checks before command execution
-- Provide clear error messages for invalid input
-- Format currency amounts consistently using CurrencyFormatter
-- Handle offline players appropriately
-
-### Data Storage
-
-- Use the DataStore interface for all database operations
-- Implement proper connection handling and cleanup
-- Use UUID-based player identification for consistency
-- Handle database migration between storage types
-- Implement caching for frequently accessed data
-
-### API Integration
-
-- Maintain full Vault compatibility
-- Implement TokenEconomyAPI for third-party integration
-- Use async operations for database-heavy tasks
-- Provide clear API documentation and examples
-
-## Performance Considerations
-
-See the detailed documentation in [Performance Considerations](../docs/tokeneconomy-performance-considerations.md).
-
-Key principles:
-
-- Use prepared statements for all database queries
-- Implement connection pooling for MySQL backends
-- Cache frequently accessed configuration values
-- Use async operations for database-intensive tasks
-- Monitor database connection health and retry failed operations
-
-## Development Workflow
-
-### Building and Testing
-
-To build and test the plugin, use one of the following methods:
-
-- **Build Plugin**
-  - Use the `Build Plugin` task to compile and package the plugin JAR
-
-- **Reload Server**:
-  - Use the `Reload Server` task to build, copy and reload the plugin without restarting the server
-
-- **Restart Server**:
-  - Use the `Restart Server` task to build, copy and fully restart the server for testing major changes
-
-These tasks can be executed from the VS Code task runner or directly from the terminal using the provided PowerShell scripts.
-
-### Currency Formatting
-
-- Always use `CurrencyFormatter.format()` for displaying currency amounts
-- Support both singular and plural currency names
-- Use currency symbols when appropriate
-- Maintain consistent decimal formatting across all displays
-
-### Vault Integration
-
-- Ensure all Vault Economy methods are properly implemented
-- Test compatibility with other economy-dependent plugins
-- Handle edge cases like negative balances and maximum limits
-- Provide meaningful error messages for Vault operations
-
-## Documentation Reference
-
-### Context Window Include Directive
-
-- **Only include linked documentation files if relevant to current task or question.**
-- **Limit included files to those that directly relate to the task at hand.**
-- **Search documentation for TokenEconomy-specific implementation details.**
-
-### TokenEconomy Project Information
-
-- [README](../README.md)
-- [ROADMAP](../ROADMAP.md)
-
-### Architecture & Design
-
-- [Database Architecture](../docs/tokeneconomy-database-architecture.md)
-- [Command Structure](../docs/tokeneconomy-command-structure.md)
-- [Performance Considerations](../docs/tokeneconomy-performance-considerations.md)
-- [API Documentation](../docs/tokeneconomy-api-documentation.md)
-- [Configuration Guide](../docs/tokeneconomy-configuration-guide.md)
-- [Storage Backends](../docs/tokeneconomy-storage-backends.md)
-- [Vault Integration](../docs/tokeneconomy-vault-integration.md)
-- [Migration Guide](../docs/tokeneconomy-migration-guide.md)
-
-### Development Resources
-
-- [Contributing Guidelines](../docs/CONTRIBUTING.md)
-
----
-
-**Last Updated**: September 26, 2025 | **Version**: 1.0 with Metamake Support
+- **Architecture Patterns**: `docs/architecture/shared-patterns.md`
+- **Coding Standards**: `docs/standard/coding-standards.md`
