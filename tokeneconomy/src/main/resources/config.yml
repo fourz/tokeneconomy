@@ -22,9 +22,13 @@ storage:
     port: 3306
     username: root
     password: ''
-    useSSL: false    
-    database: 
-    tablePrefix: tokeneconomy_  
+    useSSL: false
+    database:
+    tablePrefix: token_
     connectionTimeout: 5000
     maxRetries: 3
     retryDelay: 2000
+  sqlite:
+    database: data.db
+    # Table prefix for shared database hosting (e.g., "token_" creates "token_economy")
+    tablePrefix: ""

@@ -16,11 +16,34 @@ public class SQLiteDataStore implements DataStore {
     private final File dbPath;
     private final ConfigLoader configLoader;
     private final Plugin plugin;
+    private final String tablePrefix;
+    private final String ECONOMY_TABLE;
 
     public SQLiteDataStore(File dbPath, ConfigLoader configLoader, Plugin plugin) {
         this.dbPath = dbPath;
         this.configLoader = configLoader;
         this.plugin = plugin;
+
+        // Load table prefix from config
+        this.tablePrefix = plugin.getConfig().getString("storage.sqlite.tablePrefix", "");
+        if (tablePrefix != null && !tablePrefix.isEmpty()) {
+            LOGGER.info("Using table prefix: " + tablePrefix);
+        }
+
+        // Initialize prefixed table name
+        this.ECONOMY_TABLE = table("economy");
+    }
+
+    /**
+     * Get the table name with prefix applied.
+     * @param baseName The base table name (e.g., "economy")
+     * @return The prefixed table name (e.g., "token_economy")
+     */
+    private String table(String baseName) {
+        if (tablePrefix == null || tablePrefix.isEmpty()) {
+            return baseName;
+        }
+        return tablePrefix + baseName;
     }
 
     public void setupDatabase() {
@@ -56,7 +79,7 @@ public class SQLiteDataStore implements DataStore {
 
     public double getPlayerBalance(Player player) {
         try (PreparedStatement stmt = connection.prepareStatement(
-                "SELECT BALANCE FROM economy WHERE UUID = ?")) {
+                "SELECT BALANCE FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
             stmt.setString(1, player.getUniqueId().toString());
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -71,7 +94,7 @@ public class SQLiteDataStore implements DataStore {
 
     public double getPlayerBalanceByUUID(UUID playerUUID) {
         try (PreparedStatement stmt = connection.prepareStatement(
-                "SELECT BALANCE FROM economy WHERE UUID = ?")) {
+                "SELECT BALANCE FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
             stmt.setString(1, playerUUID.toString());
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -86,7 +109,7 @@ public class SQLiteDataStore implements DataStore {
 
     public boolean changePlayerBalance(UUID playerUUID, double amount) {
         try (PreparedStatement stmt = connection.prepareStatement(
-                "UPDATE economy SET BALANCE = BALANCE + ? WHERE UUID = ?")) {
+                "UPDATE " + ECONOMY_TABLE + " SET BALANCE = BALANCE + ? WHERE UUID = ?")) {
             stmt.setDouble(1, amount);
             stmt.setString(2, playerUUID.toString());
             return stmt.executeUpdate() > 0;
@@ -98,7 +121,7 @@ public class SQLiteDataStore implements DataStore {
 
     public void setPlayerBalance(Player player, double balance) {
         try (PreparedStatement stmt = connection.prepareStatement(
-                "INSERT INTO economy (UUID, BALANCE) VALUES (?, ?) " +
+                "INSERT INTO " + ECONOMY_TABLE + " (UUID, BALANCE) VALUES (?, ?) " +
                         "ON CONFLICT(UUID) DO UPDATE SET BALANCE = ?")) {
             stmt.setString(1, player.getUniqueId().toString());
             stmt.setDouble(2, balance);
@@ -111,7 +134,7 @@ public class SQLiteDataStore implements DataStore {
 
     public void setPlayerBalance(UUID playerUUID, double balance) {
         try (PreparedStatement stmt = connection.prepareStatement(
-                "INSERT INTO economy (UUID, BALANCE) VALUES (?, ?) " +
+                "INSERT INTO " + ECONOMY_TABLE + " (UUID, BALANCE) VALUES (?, ?) " +
                         "ON CONFLICT(UUID) DO UPDATE SET BALANCE = ?")) {
             stmt.setString(1, playerUUID.toString());
             stmt.setDouble(2, balance);
@@ -125,7 +148,7 @@ public class SQLiteDataStore implements DataStore {
     public Map<String, Double> getTopBalances(int limit) {
         Map<String, Double> topBalances = new LinkedHashMap<>();
         try (PreparedStatement stmt = connection.prepareStatement(
-                "SELECT UUID, BALANCE FROM economy ORDER BY BALANCE DESC LIMIT ?")) {
+                "SELECT UUID, BALANCE FROM " + ECONOMY_TABLE + " ORDER BY BALANCE DESC LIMIT ?")) {
             stmt.setInt(1, limit);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
@@ -141,7 +164,7 @@ public class SQLiteDataStore implements DataStore {
     public Map<String, Double> getAllPlayerBalances() {
         Map<String, Double> balances = new LinkedHashMap<>();
         try (Statement stmt = connection.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT UUID, BALANCE FROM economy")) {
+             ResultSet rs = stmt.executeQuery("SELECT UUID, BALANCE FROM " + ECONOMY_TABLE)) {
             while (rs.next()) {
                 balances.put(rs.getString("UUID"), rs.getDouble("BALANCE"));
             }
@@ -157,7 +180,7 @@ public class SQLiteDataStore implements DataStore {
 
     public boolean playerExists(Player player) {
         try (PreparedStatement stmt = connection.prepareStatement(
-                "SELECT 1 FROM economy WHERE UUID = ?")) {
+                "SELECT 1 FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
             stmt.setString(1, player.getUniqueId().toString());
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
@@ -226,7 +249,7 @@ public class SQLiteDataStore implements DataStore {
 
     private void createEconomyTable() throws SQLException {
         try (Statement stmt = connection.createStatement()) {
-            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS economy (" +
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS " + ECONOMY_TABLE + " (" +
                     "UUID TEXT PRIMARY KEY," +
                     "BALANCE REAL NOT NULL" +
                     ")");
