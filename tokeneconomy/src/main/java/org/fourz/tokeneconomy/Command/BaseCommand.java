@@ -5,6 +5,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 import org.fourz.tokeneconomy.TokenEconomy;
@@ -26,8 +27,12 @@ public abstract class BaseCommand implements CommandExecutor, TabCompleter {
 
     protected abstract boolean execute(CommandSender sender, String[] args);
 
-    // Common permission check
+    // Common permission check - Console bypasses all permissions
     protected boolean checkPermission(CommandSender sender, String permission) {
+        // Console always has permission
+        if (sender instanceof ConsoleCommandSender) {
+            return true;
+        }
         if (!sender.hasPermission("tokeneconomy." + permission)) {
             sendError(sender, "You don't have permission to use this command.");
             return false;

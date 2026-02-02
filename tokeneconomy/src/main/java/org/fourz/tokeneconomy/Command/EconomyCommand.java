@@ -5,6 +5,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.util.StringUtil;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
@@ -30,41 +31,51 @@ public class EconomyCommand implements CommandExecutor, TabCompleter {
     public EconomyCommand(TokenEconomy plugin) {
         this.plugin = plugin;
         this.commands = new HashMap<>();
-        
+
         // Initialize all available economy subcommands
         commands.put("balance", new BalanceCommand(plugin));
         commands.put("pay", new PayCommand(plugin));
         commands.put("set", new SetCommand(plugin));
         commands.put("add", new AddCommand(plugin));
         commands.put("top", new TopCommand(plugin));
-        commands.put("debug", new DebugCommand(plugin));  // Add debug command
+        commands.put("debug", new DebugCommand(plugin));
+        commands.put("help", new HelpCommand(plugin));  // bug-02 fix: Register help command
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        // Default to help command if no arguments provided
+        // bug-01 fix: Default to help command if no arguments provided
         if (args.length == 0) {
-            return commands.get("help").execute(sender, args);
+            BaseCommand helpCmd = commands.get("help");
+            if (helpCmd != null) {
+                return helpCmd.execute(sender, args);
+            }
+            // Fallback if help command somehow doesn't exist
+            sender.sendMessage(ChatColor.RED + "Use /economy help for available commands");
+            return true;
         }
 
         // Process command and resolve aliases
         String subCommand = args[0].toLowerCase();
         subCommand = COMMAND_ALIASES.getOrDefault(subCommand, subCommand);
-        
-        // Validate command exists and user has permission
+
+        // bug-01 fix: Validate command exists before attempting to execute
         BaseCommand cmd = commands.get(subCommand);
         if (cmd == null) {
             sender.sendMessage(ChatColor.RED + "Unknown command. Use /economy help for available commands");
             return true;
         }
 
-        if (!sender.hasPermission("tokeneconomy." + subCommand)) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission to use this command.");
-            return true;
+        // bug-03 fix: Bypass permission check for console
+        if (!(sender instanceof ConsoleCommandSender)) {
+            if (!sender.hasPermission("tokeneconomy." + subCommand)) {
+                sender.sendMessage(ChatColor.RED + "You don't have permission to use this command.");
+                return true;
+            }
         }
 
         // Execute command with remaining arguments
-        String[] newArgs = args.length > 1 ? 
+        String[] newArgs = args.length > 1 ?
             Arrays.copyOfRange(args, 1, args.length) : new String[0];
         return cmd.execute(sender, newArgs);
     }
