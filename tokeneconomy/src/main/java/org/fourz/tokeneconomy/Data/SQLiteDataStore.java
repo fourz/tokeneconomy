@@ -6,6 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Logger;
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.fourz.tokeneconomy.ConfigLoader;
@@ -152,13 +154,34 @@ public class SQLiteDataStore implements DataStore {
             stmt.setInt(1, limit);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    topBalances.put(rs.getString("UUID"), rs.getDouble("BALANCE"));
+                    String uuidStr = rs.getString("UUID");
+                    double balance = rs.getDouble("BALANCE");
+                    // Resolve UUID to player name
+                    String displayName = resolvePlayerName(uuidStr);
+                    topBalances.put(displayName, balance);
                 }
             }
         } catch (SQLException e) {
             LOGGER.warning("Failed to retrieve top balances: " + e.getMessage());
         }
         return topBalances;
+    }
+
+    /**
+     * Resolves a UUID string to a player name.
+     * Falls back to the UUID if the player name cannot be resolved.
+     * @param uuidStr The UUID string
+     * @return The player name or UUID if not resolvable
+     */
+    private String resolvePlayerName(String uuidStr) {
+        try {
+            UUID uuid = UUID.fromString(uuidStr);
+            OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
+            String name = offlinePlayer.getName();
+            return name != null ? name : uuidStr;
+        } catch (Exception e) {
+            return uuidStr;
+        }
     }
 
     public Map<String, Double> getAllPlayerBalances() {
