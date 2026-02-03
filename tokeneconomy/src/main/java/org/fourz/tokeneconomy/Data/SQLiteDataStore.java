@@ -48,6 +48,10 @@ public class SQLiteDataStore implements DataStore {
         return tablePrefix + baseName;
     }
 
+    public String getTablePrefix() {
+        return tablePrefix;
+    }
+
     public void setupDatabase() {
         try {
             ensureDataFolderExists();
@@ -268,6 +272,10 @@ public class SQLiteDataStore implements DataStore {
         } else {
             throw new SQLException("Failed to establish SQLite database connection.");
         }
+    }
+
+    public Connection getConnection() {
+        return connection;
     }
 
     private void createEconomyTable() throws SQLException {

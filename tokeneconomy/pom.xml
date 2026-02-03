@@ -75,7 +75,14 @@
             <version>3.47.1.0</version>
         </dependency>
 
-        
+        <!-- RVNKCore (shared testing framework) -->
+        <dependency>
+            <groupId>org.fourz</groupId>
+            <artifactId>rvnkcore</artifactId>
+            <version>1.3.0-alpha</version>
+            <scope>provided</scope>
+        </dependency>
+
     </dependencies>
     
     <build>

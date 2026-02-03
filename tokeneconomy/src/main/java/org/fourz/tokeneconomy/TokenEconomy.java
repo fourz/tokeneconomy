@@ -12,32 +12,43 @@ import org.fourz.tokeneconomy.Data.DataConnector;
 import org.fourz.tokeneconomy.Command.BalanceCommand;
 
 import net.milkbowl.vault.economy.Economy;
+import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.logging.Level;
 
 public class TokenEconomy extends JavaPlugin {
     // These components are separated to maintain single responsibility principle and improve maintainability
     private ConfigLoader configLoader;
     private DataConnector dataConnector;
+    private LogManager logger;
     private Map<String, Double> playerBalances = new LinkedHashMap<>();
 
     @Override
     public void onEnable() {
         try {
-            getLogger().info("Enabling TokenEconomy...");
-            getLogger().info("Initializing TokenEconomy...");
-            
+            // Initialize LogManager early
+            this.logger = LogManager.getInstance(this);
+
             // Save default config if it doesn't exist
             saveDefaultConfig();
-            
+
             // Initialize configuration first
             configLoader = new ConfigLoader(this);
             configLoader.loadConfig();
+
+            // Apply log level from config
+            String logLevelStr = getConfig().getString("general.logLevel", "INFO");
+            Level logLevel = LogManager.parseLevel(logLevelStr);
+            LogManager.setPluginLogLevel(this, logLevel);
+
+            logger.info("Enabling TokenEconomy...");
+            logger.info("Initializing TokenEconomy...");
             
             // Initialize Vault after config is loaded
             if (!setupVault()) {
-                getLogger().severe("Vault not found! TokenEconomy cannot function as an economy plugin.");
+                logger.error("Vault not found! TokenEconomy cannot function as an economy plugin.");
                 getServer().getPluginManager().disablePlugin(this);
                 return;
             }            
@@ -45,7 +56,7 @@ public class TokenEconomy extends JavaPlugin {
             // Setup database
             dataConnector = new DataConnector(this);
             dataConnector.setupDatabase();
-            getLogger().info("Database setup complete.");
+            logger.info("Database setup complete.");
 
             // Register commands and hooks
             registerCommands();
@@ -53,13 +64,13 @@ public class TokenEconomy extends JavaPlugin {
 
             TokenEconomyAPI.init(this);
 
-            getLogger().info("TokenEconomy successfully enabled!");
+            logger.info("TokenEconomy successfully enabled!");
         } catch (Exception e) {
-            getLogger().severe("An error occurred while enabling TokenEconomy: " + e.getMessage());
+            logger.error("An error occurred while enabling TokenEconomy: " + e.getMessage());
             e.printStackTrace();
-            getLogger().severe("Stack Trace: ");
+            logger.error("Stack Trace: ");
             for (StackTraceElement element : e.getStackTrace()) {
-                getLogger().severe(element.toString());
+                logger.error(element.toString());
             }
         }
     }
@@ -67,23 +78,23 @@ public class TokenEconomy extends JavaPlugin {
     @Override
     public void onDisable() {
         try {
-            getLogger().info("Disabling TokenEconomy...");
-            getLogger().info("Disabling TokenEconomy...");
+            logger.info("Disabling TokenEconomy...");
+            logger.info("Disabling TokenEconomy...");
             if (dataConnector != null) {
                 // Save and close database
                 dataConnector.saveDatabase();
                 dataConnector.closeDatabase();
             }
         } catch (Exception e) {
-            getLogger().severe("An error occurred while disabling TokenEconomy: " + e.getMessage());
+            logger.error("An error occurred while disabling TokenEconomy: " + e.getMessage());
             e.printStackTrace();
-            getLogger().severe("Stack Trace: ");
+            logger.error("Stack Trace: ");
             for (StackTraceElement element : e.getStackTrace()) {
-                getLogger().severe(element.toString());
+                logger.error(element.toString());
             }
         }
 
-        getLogger().info("TokenEconomy successfully disabled.");
+        logger.info("TokenEconomy successfully disabled.");
     }
 
     // Remove redundant loadConfig() method since it's now handled by ConfigLoader
@@ -95,7 +106,7 @@ public class TokenEconomy extends JavaPlugin {
             return false;
         }
         getServer().getServicesManager().register(Economy.class, new TokenEconomyVaultAdapter(this), this, ServicePriority.Normal);
-        getLogger().info("TokenEconomy registered as a Vault economy provider.");
+        logger.info("TokenEconomy registered as a Vault economy provider.");
         return true;
     }
 
@@ -110,16 +121,16 @@ public class TokenEconomy extends JavaPlugin {
         if (getCommand("pay") != null) {
             getCommand("pay").setExecutor(new PayCommand(this));
         }
-        getLogger().info("Commands registered successfully.");
+        logger.info("Commands registered successfully.");
     }
 
     private void registerGriefProtectionHook() {
         // Integrates with GriefPrevention plugin for land claim features
         if (Bukkit.getPluginManager().isPluginEnabled("GriefPrevention")) {
-            getLogger().info("GriefPrevention found! Integrating land claim support.");
+            logger.info("GriefPrevention found! Integrating land claim support.");
             // Add GriefPrevention-related hooks here
         } else {
-            getLogger().warning("GriefPrevention not found. Land claim features disabled.");
+            logger.warning("GriefPrevention not found. Land claim features disabled.");
         }
     }
 

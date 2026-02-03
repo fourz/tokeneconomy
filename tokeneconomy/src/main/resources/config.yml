@@ -1,3 +1,6 @@
+general:
+  logLevel: INFO
+
 economy:
   currencyNameSingular: Wizbuck
   currencyNamePlural: Wizbucks

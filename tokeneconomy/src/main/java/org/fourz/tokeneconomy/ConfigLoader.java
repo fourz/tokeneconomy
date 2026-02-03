@@ -2,11 +2,13 @@ package org.fourz.tokeneconomy;
 
 // Standard imports for configuration handling
 import org.bukkit.configuration.file.FileConfiguration;
+import org.fourz.rvnkcore.util.log.LogManager;
 import java.io.File;
 
 public class ConfigLoader {
     // Core plugin reference and currency naming fields
     private final TokenEconomy plugin;
+    private final LogManager logger;
     private String currencyNameSingular;
     private String currencyNamePlural;
     private String currencySymbol;
@@ -27,6 +29,7 @@ public class ConfigLoader {
 
     public ConfigLoader(TokenEconomy plugin) {
         this.plugin = plugin;
+        this.logger = LogManager.getInstance(plugin);
     }
 
     public void loadConfig() {
@@ -66,7 +69,7 @@ public class ConfigLoader {
             mysqlRetryDelay = config.getInt("storage.mysql.retryDelay", 2000);
             
             // Log MySQL configuration (excluding sensitive data)
-            plugin.getLogger().info(String.format(
+            logger.info(String.format(
                 "MySQL Configuration: host=%s, port=%d, database=%s, useSSL=%s", 
                 mysqlHost, mysqlPort, mysqlDatabase, mysqlUseSSL));
         }

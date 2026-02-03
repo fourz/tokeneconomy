@@ -214,6 +214,14 @@ public class DataConnector {
         return dataStore.getAllPlayerBalances();
     }
 
+    /**
+     * Get the active data store for direct access (used by test data generators).
+     * @return the active DataStore instance
+     */
+    public DataStore getDataStore() {
+        return dataStore;
+    }
+
     private void migrateData(DataStore sourceStore, DataStore targetStore) {
         try {
             // Initialize both stores before migration

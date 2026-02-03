@@ -40,6 +40,10 @@ public class MySQLDataStore implements DataStore {
         this.retryDelay = configLoader.getMySQLRetryDelay();
     }
 
+    public String getTablePrefix() {
+        return tablePrefix;
+    }
+
     public void setupDatabase() {
         try {
             if (connection == null || connection.isClosed()) {
@@ -290,6 +294,10 @@ public class MySQLDataStore implements DataStore {
         try (Statement stmt = connection.createStatement()) {
             stmt.executeUpdate(createTableSQL);
         }
+    }
+
+    public Connection getConnection() {
+        return connection;
     }
 
     private void ensureConnected() throws SQLException {
