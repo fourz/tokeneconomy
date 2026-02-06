@@ -2,6 +2,7 @@ package org.fourz.tokeneconomy.Command;
 
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 
@@ -9,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 /**
  * Debug command for TokenEconomy.
@@ -42,6 +44,10 @@ public class DebugCommand extends BaseCommand {
             if (subCommand.equals("seed")) {
                 return seedCommand.execute(sender, subArgs);
             }
+
+            if (subCommand.equals("loglevel")) {
+                return handleLogLevel(sender, subArgs);
+            }
         }
 
         // Default: show debug info
@@ -69,7 +75,37 @@ public class DebugCommand extends BaseCommand {
             ChatColor.WHITE + allBalances.size());
 
         // Show available subcommands
-        sender.sendMessage(ChatColor.GRAY + "Subcommands: /eco debug seed <action>");
+        sender.sendMessage(ChatColor.GRAY + "Subcommands: /eco debug seed|loglevel <action>");
+
+        return true;
+    }
+
+    /**
+     * Handle the loglevel subcommand.
+     * Usage: /eco debug loglevel [DEBUG|INFO|WARN|OFF]
+     */
+    private boolean handleLogLevel(CommandSender sender, String[] args) {
+        if (args.length == 0) {
+            // Show current log level from config
+            String currentLevel = plugin.getConfig().getString("general.logLevel", "INFO");
+            sender.sendMessage(ChatColor.GOLD + "Current log level: " +
+                ChatColor.WHITE + currentLevel);
+            sender.sendMessage(ChatColor.GRAY + "Usage: /eco debug loglevel <DEBUG|INFO|WARN|OFF>");
+            return true;
+        }
+
+        String levelStr = args[0].toUpperCase();
+        Level level = LogManager.parseLevel(levelStr);
+
+        // Set log level for all TokenEconomy loggers
+        LogManager.setPluginLogLevel(plugin, level);
+
+        // Update config for persistence (use same path as onEnable)
+        plugin.getConfig().set("general.logLevel", levelStr);
+        plugin.saveConfig();
+
+        sender.sendMessage(ChatColor.GREEN + "Log level set to: " + ChatColor.WHITE + levelStr);
+        sender.sendMessage(ChatColor.GRAY + "(Saved to config.yml)");
 
         return true;
     }
@@ -85,7 +121,24 @@ public class DebugCommand extends BaseCommand {
             if ("seed".startsWith(partial)) {
                 completions.add("seed");
             }
-        } else if (args.length > 1 && args[0].equalsIgnoreCase("seed")) {
+            if ("loglevel".startsWith(partial)) {
+                completions.add("loglevel");
+            }
+        } else if (args.length == 2) {
+            if (args[0].equalsIgnoreCase("seed")) {
+                return seedCommand.getTabCompletions(sender,
+                    Arrays.copyOfRange(args, 1, args.length));
+            }
+            if (args[0].equalsIgnoreCase("loglevel")) {
+                String partial = args[1].toUpperCase();
+                List<String> levels = Arrays.asList("DEBUG", "INFO", "WARN", "OFF");
+                for (String level : levels) {
+                    if (level.startsWith(partial)) {
+                        completions.add(level);
+                    }
+                }
+            }
+        } else if (args.length > 2 && args[0].equalsIgnoreCase("seed")) {
             return seedCommand.getTabCompletions(sender,
                 Arrays.copyOfRange(args, 1, args.length));
         }

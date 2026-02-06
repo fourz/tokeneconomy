@@ -4,9 +4,9 @@ import org.bukkit.plugin.Plugin;
 import org.fourz.tokeneconomy.ConfigLoader;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.bukkit.entity.Player;
+import org.fourz.rvnkcore.util.log.LogManager;
 import java.sql.*;
 import java.io.File;
-import java.util.logging.Logger;
 import java.util.Map;
 import java.util.UUID;
 
@@ -17,14 +17,14 @@ import java.util.UUID;
 public class DataConnector {
 
     private final File dbPath;
-    private static final Logger LOGGER = Logger.getLogger("TokenEconomy");
+    private final LogManager logger;
     private final Plugin plugin;
     private final ConfigLoader configLoader;
     private DataStore dataStore;
 
     public DataConnector(Plugin plugin) {
-
         this.plugin = plugin;
+        this.logger = LogManager.getInstance(plugin, "DataConnector");
 
         this.configLoader = ((TokenEconomy)plugin).getConfigLoader();
         String storageType = configLoader.getStorageType();
@@ -32,7 +32,7 @@ public class DataConnector {
 
         if (configLoader.shouldMigrateFromMySQL()) {
             if (!migrationStatus.equals("completed")) {
-                LOGGER.info("Starting migration from MySQL to SQLite.");
+                logger.info("Starting migration from MySQL to SQLite.");
                 configLoader.setMigrationStatus("in_progress");
                 try {
                     DataStore sourceStore = new MySQLDataStore(configLoader, plugin);
@@ -54,20 +54,20 @@ public class DataConnector {
                     plugin.getConfig().set("storage.migrate_from_mysql", false);
                     plugin.getConfig().set("storage.type", "sqlite");
                     plugin.saveConfig();
-                    LOGGER.info("Migration from MySQL to SQLite completed successfully.");
+                    logger.info("Migration from MySQL to SQLite completed successfully.");
                     storageType = "sqlite";
                 } catch (Exception e) {
-                    LOGGER.severe("Migration failed: " + e.getMessage());
+                    logger.error("Migration failed: " + e.getMessage());
                     e.printStackTrace();
                     configLoader.setMigrationStatus("failed");
                     // Fallback to SQLite if MySQL migration fails
-                    LOGGER.info("Falling back to SQLite storage.");
+                    logger.info("Falling back to SQLite storage.");
                     storageType = "sqlite";
                     plugin.getConfig().set("storage.type", "sqlite");
                     plugin.saveConfig();
                 }
             } else {
-                LOGGER.info("Migration from MySQL to SQLite already completed.");
+                logger.info("Migration from MySQL to SQLite already completed.");
                 plugin.getConfig().set("storage.migrate_from_mysql", false);
                 plugin.getConfig().set("storage.type", "sqlite");
                 plugin.saveConfig();
@@ -75,7 +75,7 @@ public class DataConnector {
             }
         } else if (configLoader.shouldMigrateFromSQLite()) {
             if (!migrationStatus.equals("completed")) {
-                LOGGER.info("Starting migration from SQLite to MySQL.");
+                logger.info("Starting migration from SQLite to MySQL.");
                 configLoader.setMigrationStatus("in_progress");
                 try {
                     DataStore sourceStore = new SQLiteDataStore(
@@ -97,20 +97,20 @@ public class DataConnector {
                     plugin.getConfig().set("storage.migrate_from_sqlite", false);
                     plugin.getConfig().set("storage.type", "mysql");
                     plugin.saveConfig();
-                    LOGGER.info("Migration from SQLite to MySQL completed successfully.");
+                    logger.info("Migration from SQLite to MySQL completed successfully.");
                     storageType = "mysql";
                 } catch (Exception e) {
-                    LOGGER.severe("Migration failed: " + e.getMessage());
+                    logger.error("Migration failed: " + e.getMessage());
                     e.printStackTrace();
                     configLoader.setMigrationStatus("failed");
                     // Fallback to SQLite if MySQL migration fails
-                    LOGGER.info("Falling back to SQLite storage.");
+                    logger.info("Falling back to SQLite storage.");
                     storageType = "sqlite";
                     plugin.getConfig().set("storage.type", "sqlite");
                     plugin.saveConfig();
                 }
             } else {
-                LOGGER.info("Migration from SQLite to MySQL already completed.");
+                logger.info("Migration from SQLite to MySQL already completed.");
                 plugin.getConfig().set("storage.migrate_from_sqlite", false);
                 plugin.getConfig().set("storage.type", "mysql");
                 plugin.saveConfig();
@@ -131,7 +131,7 @@ public class DataConnector {
                 break;
             default:
                 this.dbPath = null;
-                LOGGER.severe("Invalid storage type in config.yml: " + storageType);
+                logger.error("Invalid storage type in config.yml: " + storageType);
                 break;
         }        
     }
@@ -144,7 +144,7 @@ public class DataConnector {
         try {
             return dataStore.isConnected();
         } catch (SQLException e) {
-            LOGGER.severe("Failed to check connection status: " + e.getMessage());
+            logger.error("Failed to check connection status: " + e.getMessage());
             return false;
         }
     }
@@ -225,22 +225,22 @@ public class DataConnector {
     private void migrateData(DataStore sourceStore, DataStore targetStore) {
         try {
             // Initialize both stores before migration
-            LOGGER.info("Attempting to initialize source database...");
+            logger.info("Attempting to initialize source database...");
             if (!initializeStore(sourceStore)) {
                 throw new SQLException("Failed to initialize source database - check connection parameters and permissions");
             }
-            LOGGER.info("Source database initialized successfully");
+            logger.info("Source database initialized successfully");
 
-            LOGGER.info("Attempting to initialize target database...");
+            logger.info("Attempting to initialize target database...");
             if (!initializeStore(targetStore)) {
                 throw new SQLException("Failed to initialize target database - check connection parameters and permissions");
             }
-            LOGGER.info("Target database initialized successfully");
+            logger.info("Target database initialized successfully");
 
             Map<String, Double> balances = sourceStore.getAllPlayerBalances();
             int totalPlayers = balances.size();
             int migratedPlayers = 0;
-            LOGGER.info("Starting data migration for " + totalPlayers + " players.");
+            logger.info("Starting data migration for " + totalPlayers + " players.");
 
             for (Map.Entry<String, Double> entry : balances.entrySet()) {
                 try {
@@ -250,20 +250,20 @@ public class DataConnector {
                     migratedPlayers++;
 
                     if (migratedPlayers % 100 == 0) {
-                        LOGGER.info("Migrated " + migratedPlayers + "/" + totalPlayers + " player balances.");
+                        logger.info("Migrated " + migratedPlayers + "/" + totalPlayers + " player balances.");
                     }
                 } catch (Exception e) {
-                    LOGGER.warning("Failed to migrate player " + entry.getKey() + ": " + e.getMessage());
+                    logger.warning("Failed to migrate player " + entry.getKey() + ": " + e.getMessage());
                 }
             }
-            LOGGER.info("Data migration completed. Successfully migrated: " + migratedPlayers + "/" + totalPlayers + " player balances");
+            logger.info("Data migration completed. Successfully migrated: " + migratedPlayers + "/" + totalPlayers + " player balances");
             
             if (migratedPlayers < totalPlayers) {
-                LOGGER.warning("Some player data failed to migrate. Check logs for details.");
+                logger.warning("Some player data failed to migrate. Check logs for details.");
             }
         } catch (SQLException e) {
-            LOGGER.severe("Migration failed due to database error: " + e.getMessage());
-            LOGGER.severe("Database State - Source connected: " + connectionStatus(sourceStore) + 
+            logger.error("Migration failed due to database error: " + e.getMessage());
+            logger.error("Database State - Source connected: " + connectionStatus(sourceStore) + 
                          ", Target connected: " + connectionStatus(targetStore));
             throw new RuntimeException("Migration failed", e);
         }
@@ -281,12 +281,12 @@ public class DataConnector {
         try {
             store.setupDatabase();
             if (!testConnection(store)) {
-                LOGGER.severe("Failed to initialize database connection");
+                logger.error("Failed to initialize database connection");
                 return false;
             }
             return true;
         } catch (Exception e) {
-            LOGGER.severe("Failed to initialize database: " + e.getMessage());
+            logger.error("Failed to initialize database: " + e.getMessage());
             e.printStackTrace();
             return false;
         }
@@ -296,7 +296,7 @@ public class DataConnector {
         try {
             return store.isConnected();
         } catch (SQLException e) {
-            LOGGER.severe("Connection test failed: " + e.getMessage());
+            logger.error("Connection test failed: " + e.getMessage());
             return false;
         }
     }

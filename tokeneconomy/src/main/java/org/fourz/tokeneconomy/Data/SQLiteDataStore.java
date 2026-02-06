@@ -5,16 +5,16 @@ import java.sql.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.tokeneconomy.ConfigLoader;
 
 public class SQLiteDataStore implements DataStore {
     private Connection connection;
-    private final Logger LOGGER = Logger.getLogger("TokenEconomy");
+    private final LogManager logger;
     private final File dbPath;
     private final ConfigLoader configLoader;
     private final Plugin plugin;
@@ -25,11 +25,12 @@ public class SQLiteDataStore implements DataStore {
         this.dbPath = dbPath;
         this.configLoader = configLoader;
         this.plugin = plugin;
+        this.logger = LogManager.getInstance(plugin, "SQLiteDataStore");
 
         // Load table prefix from config
         this.tablePrefix = plugin.getConfig().getString("storage.sqlite.tablePrefix", "");
         if (tablePrefix != null && !tablePrefix.isEmpty()) {
-            LOGGER.info("Using table prefix: " + tablePrefix);
+            logger.info("Using table prefix: " + tablePrefix);
         }
 
         // Initialize prefixed table name
@@ -60,9 +61,9 @@ public class SQLiteDataStore implements DataStore {
             }
             initializeDatabaseConnection();
             createEconomyTable();
-            LOGGER.info("SQLite database setup successful.");
+            logger.info("SQLite database setup successful.");
         } catch (SQLException e) {
-            LOGGER.severe("SQLite database setup failed: " + e.getMessage());
+            logger.error("SQLite database setup failed: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -71,7 +72,7 @@ public class SQLiteDataStore implements DataStore {
         try {
             connection.close();
         } catch (SQLException e) {
-            LOGGER.severe("Failed to save SQLite database: " + e.getMessage());
+            logger.error("Failed to save SQLite database: " + e.getMessage());
         }
     }
 
@@ -79,7 +80,7 @@ public class SQLiteDataStore implements DataStore {
         try {
             connection.close();
         } catch (SQLException e) {
-            LOGGER.severe("Failed to close SQLite database: " + e.getMessage());
+            logger.error("Failed to close SQLite database: " + e.getMessage());
         }
     }
 
@@ -93,7 +94,7 @@ public class SQLiteDataStore implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.warning("Failed to retrieve player balance: " + e.getMessage());
+            logger.warning("Failed to retrieve player balance: " + e.getMessage());
         }
         return 0.0;
     }
@@ -108,7 +109,7 @@ public class SQLiteDataStore implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.warning("Failed to retrieve player balance: " + e.getMessage());
+            logger.warning("Failed to retrieve player balance: " + e.getMessage());
         }
         return 0.0;
     }
@@ -120,7 +121,7 @@ public class SQLiteDataStore implements DataStore {
             stmt.setString(2, playerUUID.toString());
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            LOGGER.warning("Failed to change player balance: " + e.getMessage());
+            logger.warning("Failed to change player balance: " + e.getMessage());
             return false;
         }
     }
@@ -134,7 +135,7 @@ public class SQLiteDataStore implements DataStore {
             stmt.setDouble(3, balance);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            LOGGER.warning("Failed to set player balance: " + e.getMessage());
+            logger.warning("Failed to set player balance: " + e.getMessage());
         }
     }
 
@@ -147,7 +148,7 @@ public class SQLiteDataStore implements DataStore {
             stmt.setDouble(3, balance);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            LOGGER.warning("Failed to set player balance: " + e.getMessage());
+            logger.warning("Failed to set player balance: " + e.getMessage());
         }
     }
 
@@ -166,7 +167,7 @@ public class SQLiteDataStore implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.warning("Failed to retrieve top balances: " + e.getMessage());
+            logger.warning("Failed to retrieve top balances: " + e.getMessage());
         }
         return topBalances;
     }
@@ -196,7 +197,7 @@ public class SQLiteDataStore implements DataStore {
                 balances.put(rs.getString("UUID"), rs.getDouble("BALANCE"));
             }
         } catch (SQLException e) {
-            LOGGER.warning("Failed to retrieve all player balances: " + e.getMessage());
+            logger.warning("Failed to retrieve all player balances: " + e.getMessage());
         }
         return balances;
     }
@@ -213,7 +214,7 @@ public class SQLiteDataStore implements DataStore {
                 return rs.next();
             }
         } catch (SQLException e) {
-            LOGGER.warning("Failed to check player existence: " + e.getMessage());
+            logger.warning("Failed to check player existence: " + e.getMessage());
             return false;
         }
     }
@@ -234,15 +235,15 @@ public class SQLiteDataStore implements DataStore {
             if (!newDbFile.exists()) {
                 if (oldDbFile.renameTo(newDbFile)) {
                     deleteOldDatabaseFile(oldDbFile);
-                    LOGGER.info("Successfully migrated old economy database.");
+                    logger.info("Successfully migrated old economy database.");
                 } else {
-                    LOGGER.warning("Failed to migrate old economy database.");
+                    logger.warning("Failed to migrate old economy database.");
                 }
             } else {
-                LOGGER.info("New database already exists, skipping migration.");
+                logger.info("New database already exists, skipping migration.");
             }
         } else {
-            LOGGER.info("No old economy database found to migrate.");
+            logger.info("No old economy database found to migrate.");
         }
     }
 
@@ -250,9 +251,9 @@ public class SQLiteDataStore implements DataStore {
         try (Connection oldConnection = DriverManager.getConnection("jdbc:sqlite:" + oldDbFile.getPath());
              Statement stmt = oldConnection.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM economy")) {
-            LOGGER.info("Old database file has " + rs.getInt(1) + " records.");
+            logger.info("Old database file has " + rs.getInt(1) + " records.");
         } catch (SQLException e) {
-            LOGGER.warning("Failed to read old database file: " + e.getMessage());
+            logger.warning("Failed to read old database file: " + e.getMessage());
         }
     }
 
@@ -260,15 +261,15 @@ public class SQLiteDataStore implements DataStore {
         try {
             oldDbFile.delete();
         } catch (Exception e) {
-            LOGGER.warning("Failed to delete old database file: " + e.getMessage());
+            logger.warning("Failed to delete old database file: " + e.getMessage());
         }
     }
 
     private void initializeDatabaseConnection() throws SQLException {
-        LOGGER.info("Initializing SQLite database connection to " + dbPath.getPath());
+        logger.info("Initializing SQLite database connection to " + dbPath.getPath());
         connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath.getPath());
         if (connection != null && !connection.isClosed()) {
-            LOGGER.info("SQLite database connection established.");
+            logger.info("SQLite database connection established.");
         } else {
             throw new SQLException("Failed to establish SQLite database connection.");
         }

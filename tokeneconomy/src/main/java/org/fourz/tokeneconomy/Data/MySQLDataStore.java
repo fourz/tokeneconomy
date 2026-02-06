@@ -4,16 +4,16 @@ import java.sql.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.tokeneconomy.ConfigLoader;
 
 public class MySQLDataStore implements DataStore {
     private Connection connection;
-    private final Logger LOGGER = Logger.getLogger("TokenEconomy");
+    private final LogManager logger;
     private final String host;
     private final int port;
     private final String database;
@@ -27,12 +27,13 @@ public class MySQLDataStore implements DataStore {
     private final int retryDelay;
 
     public MySQLDataStore(ConfigLoader configLoader, Plugin plugin) {
+        this.plugin = plugin;
+        this.logger = LogManager.getInstance(plugin, "MySQLDataStore");
         this.host = configLoader.getMySQLHost();
         this.port = configLoader.getMySQLPort();
         this.database = configLoader.getMySQLDatabase();
         this.username = configLoader.getMySQLUsername();
         this.password = configLoader.getMySQLPassword();
-        this.plugin = plugin;
         this.tablePrefix = configLoader.getMySQLTablePrefix();
         this.useSSL = configLoader.getMySQLUseSSL();
         this.connectionTimeout = configLoader.getMySQLConnectionTimeout();
@@ -50,9 +51,9 @@ public class MySQLDataStore implements DataStore {
                 initializeDatabaseConnection();
             }
             createEconomyTable();
-            LOGGER.info("MySQL database setup successful.");
+            logger.info("MySQL database setup successful.");
         } catch (SQLException e) {
-            LOGGER.severe("MySQL database setup failed: " + e.getMessage());
+            logger.error("MySQL database setup failed: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Failed to setup MySQL database", e);
         }
@@ -68,7 +69,7 @@ public class MySQLDataStore implements DataStore {
                 connection.close();
             }
         } catch (SQLException e) {
-            LOGGER.severe("Failed to close MySQL database connection: " + e.getMessage());
+            logger.error("Failed to close MySQL database connection: " + e.getMessage());
         }
     }
 
@@ -86,7 +87,7 @@ public class MySQLDataStore implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.warning("Failed to retrieve player balance: " + e.getMessage());
+            logger.warning("Failed to retrieve player balance: " + e.getMessage());
         }
         return 0.0;
     }
@@ -106,7 +107,7 @@ public class MySQLDataStore implements DataStore {
             stmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            LOGGER.severe("Failed to update player balance: " + e.getMessage());
+            logger.error("Failed to update player balance: " + e.getMessage());
             return false;
         }
     }
@@ -120,7 +121,7 @@ public class MySQLDataStore implements DataStore {
             stmt.setDouble(3, balance);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            LOGGER.severe("Failed to set player balance: " + e.getMessage());
+            logger.error("Failed to set player balance: " + e.getMessage());
         }
     }
 
@@ -136,7 +137,7 @@ public class MySQLDataStore implements DataStore {
                 stmt.executeUpdate();
             }
         } catch (SQLException e) {
-            LOGGER.severe("Failed to set player balance: " + e.getMessage());
+            logger.error("Failed to set player balance: " + e.getMessage());
             throw new RuntimeException("Failed to set balance", e);
         }
     }
@@ -154,7 +155,7 @@ public class MySQLDataStore implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.warning("Failed to retrieve all player balances: " + e.getMessage());
+            logger.warning("Failed to retrieve all player balances: " + e.getMessage());
             throw new RuntimeException("Failed to retrieve balances", e);
         }
         return balances;
@@ -179,7 +180,7 @@ public class MySQLDataStore implements DataStore {
                 }
             }
         } catch (SQLException e) {
-            LOGGER.warning("Failed to retrieve top balances: " + e.getMessage());
+            logger.warning("Failed to retrieve top balances: " + e.getMessage());
         }
         return topBalances;
     }
@@ -196,7 +197,7 @@ public class MySQLDataStore implements DataStore {
                 return rs.next();
             }
         } catch (SQLException e) {
-            LOGGER.warning("Failed to check player existence: " + e.getMessage());
+            logger.warning("Failed to check player existence: " + e.getMessage());
             return false;
         }
     }
@@ -210,7 +211,7 @@ public class MySQLDataStore implements DataStore {
         String url = buildConnectionUrl();
             
         // Log connection attempt (without sensitive data)
-        LOGGER.info(String.format("Attempting MySQL connection to %s:%d/%s (SSL: %s, Timeout: %d)", 
+        logger.info(String.format("Attempting MySQL connection to %s:%d/%s (SSL: %s, Timeout: %d)", 
             host, port, database, useSSL, connectionTimeout));
 
         SQLException lastException = null;
@@ -219,7 +220,7 @@ public class MySQLDataStore implements DataStore {
                 connection = DriverManager.getConnection(url, username, password);
                 
                 if (connection.isValid(connectionTimeout)) {
-                    LOGGER.info("Successfully connected to MySQL database.");
+                    logger.info("Successfully connected to MySQL database.");
                     return;
                 } else {
                     throw new SQLException("Connection created but failed validity check.");
@@ -229,7 +230,7 @@ public class MySQLDataStore implements DataStore {
                 attempts++;
                 String errorMsg = String.format("Failed to connect to MySQL (attempt %d/%d): %s", 
                     attempts, maxRetries, e.getMessage());
-                LOGGER.warning(errorMsg);
+                logger.warning(errorMsg);
                 
                 if (attempts >= maxRetries) {
                     break;
@@ -305,7 +306,7 @@ public class MySQLDataStore implements DataStore {
             initializeDatabaseConnection();
         }
         if (!connection.isValid(connectionTimeout)) {
-            LOGGER.warning("MySQL connection lost, attempting reconnection...");
+            logger.warning("MySQL connection lost, attempting reconnection...");
             initializeDatabaseConnection();
         }
     }
