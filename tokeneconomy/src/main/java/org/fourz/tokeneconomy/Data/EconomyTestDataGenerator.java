@@ -40,8 +40,16 @@ public class EconomyTestDataGenerator extends TestDataGenerator {
             () -> dataStore instanceof MySQLDataStore,
             () -> {
                 try {
-                    Method getConnectionMethod = dataStore.getClass().getMethod("getConnection");
-                    return (Connection) getConnectionMethod.invoke(dataStore);
+                    if (dataStore instanceof MySQLDataStore) {
+                        // HikariCP pool: getDataSource().getConnection()
+                        Method getDataSourceMethod = dataStore.getClass().getMethod("getDataSource");
+                        Object ds = getDataSourceMethod.invoke(dataStore);
+                        return (Connection) ds.getClass().getMethod("getConnection").invoke(ds);
+                    } else {
+                        // SQLite: direct getConnection()
+                        Method getConnectionMethod = dataStore.getClass().getMethod("getConnection");
+                        return (Connection) getConnectionMethod.invoke(dataStore);
+                    }
                 } catch (Exception e) {
                     throw new RuntimeException("Failed to get connection", e);
                 }
