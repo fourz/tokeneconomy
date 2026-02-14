@@ -167,6 +167,9 @@ tokeneconomy/
 │   │   ├── DataConnector.java      # Storage abstraction
 │   │   ├── SQLiteDataStore.java    # SQLite implementation
 │   │   └── MySQLDataStore.java     # MySQL implementation
+│   ├── service/                    # RVNKCore service layer
+│   │   ├── IEconomyService.java   # Service interface (registered with ServiceRegistry)
+│   │   └── EconomyServiceImpl.java # Implementation wrapping DataConnector
 │   └── Utility/
 │       └── CurrencyFormatter.java  # Currency display formatting
 └── src/main/resources/
@@ -181,11 +184,39 @@ tokeneconomy/
 - **Command Pattern**: Each command is a separate class extending `BaseCommand`
 - **Configuration Management**: Centralized config loading with validation and migration support
 
+## RVNKCore Integration
+
+TokenEconomy optionally integrates with RVNKCore for cross-plugin service access via ServiceRegistry. The plugin works fully standalone without RVNKCore.
+
+### Service Interface
+
+When RVNKCore is available, `IEconomyService` is registered with the ServiceRegistry:
+
+```java
+// Access from another plugin via ServiceRegistry
+IEconomyService economyService = serviceRegistry.getService(IEconomyService.class);
+CompletableFuture<Double> balance = economyService.getBalance(playerUUID);
+CompletableFuture<Boolean> result = economyService.deposit(playerUUID, 100.0);
+```
+
+**Available Methods**:
+- `getBalance(UUID)` - Get player balance
+- `deposit(UUID, double)` - Add to balance
+- `withdraw(UUID, double)` - Remove from balance
+- `setBalance(UUID, double)` - Set absolute balance
+- `getTopBalances(int)` - Get leaderboard
+
+### Integration Status
+
+- **Level**: Minimal (service registration only)
+- **Pattern**: Reflection-based registration (no hard dependency)
+- **Full integration** (Repository, DTOs, CommandManager): Deferred until active development resumes
+
 ## Compatibility
 
 - **Minecraft Versions**: 1.21+
 - **Server Software**: Spigot, Paper, and forks
-- **Dependencies**: Vault (required)
+- **Dependencies**: Vault (required), RVNKCore (optional)
 - **Java Version**: Java 17+
 
 ## Support & Contributing

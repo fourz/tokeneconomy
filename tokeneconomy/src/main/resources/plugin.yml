@@ -5,6 +5,7 @@ description: This is a simple Bukkit Plugin
 author: fourz
 
 depends: [Vault]
+softdepend: [RVNKCore]
 
 main: org.fourz.tokeneconomy.TokenEconomy
 
