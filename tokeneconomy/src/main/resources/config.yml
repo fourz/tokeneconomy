@@ -1,5 +1,5 @@
 general:
-  logLevel: INFO
+  logLevel: WARNING
 
 economy:
   currencyNameSingular: Wizbuck
