@@ -9,12 +9,13 @@ import java.util.Map;
 import java.util.UUID;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.tokeneconomy.ConfigLoader;
+
+import java.util.logging.Logger;
 
 public class MySQLDataStore implements DataStore {
     private HikariDataSource dataSource;
-    private final LogManager logger;
+    private final Logger logger;
     private final String host;
     private final int port;
     private final String database;
@@ -27,7 +28,7 @@ public class MySQLDataStore implements DataStore {
 
     public MySQLDataStore(ConfigLoader configLoader, Plugin plugin) {
         this.plugin = plugin;
-        this.logger = LogManager.getInstance(plugin, "MySQLDataStore");
+        this.logger = plugin.getLogger();
         this.host = configLoader.getMySQLHost();
         this.port = configLoader.getMySQLPort();
         this.database = configLoader.getMySQLDatabase();
@@ -50,7 +51,7 @@ public class MySQLDataStore implements DataStore {
             createEconomyTable();
             logger.info("MySQL database setup successful.");
         } catch (SQLException e) {
-            logger.error("MySQL database setup failed: " + e.getMessage());
+            logger.severe("MySQL database setup failed: " + e.getMessage());
             e.printStackTrace();
             throw new RuntimeException("Failed to setup MySQL database", e);
         }
@@ -102,7 +103,7 @@ public class MySQLDataStore implements DataStore {
             stmt.executeUpdate();
             return true;
         } catch (SQLException e) {
-            logger.error("Failed to update player balance: " + e.getMessage());
+            logger.severe("Failed to update player balance: " + e.getMessage());
             return false;
         }
     }
@@ -117,7 +118,7 @@ public class MySQLDataStore implements DataStore {
             stmt.setDouble(3, balance);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            logger.error("Failed to set player balance: " + e.getMessage());
+            logger.severe("Failed to set player balance: " + e.getMessage());
         }
     }
 
@@ -131,7 +132,7 @@ public class MySQLDataStore implements DataStore {
             stmt.setDouble(3, balance);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            logger.error("Failed to set player balance: " + e.getMessage());
+            logger.severe("Failed to set player balance: " + e.getMessage());
             throw new RuntimeException("Failed to set balance", e);
         }
     }
@@ -192,6 +193,20 @@ public class MySQLDataStore implements DataStore {
             }
         } catch (SQLException e) {
             logger.warning("Failed to check player existence: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean playerExistsByUUID(UUID uuid) {
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                "SELECT 1 FROM " + tablePrefix + "economy WHERE UUID = ?")) {
+            stmt.setString(1, uuid.toString());
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            logger.warning("Failed to check player existence by UUID: " + e.getMessage());
             return false;
         }
     }

@@ -18,4 +18,5 @@ public interface DataStore {
     Map<String, Double> getAllPlayerBalances();
     boolean isConnected() throws SQLException;
     boolean playerExists(Player player);
+    boolean playerExistsByUUID(UUID uuid);
 }
