@@ -2,7 +2,6 @@ package org.fourz.tokeneconomy.Command;
 
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
-import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 
@@ -95,10 +94,16 @@ public class DebugCommand extends BaseCommand {
         }
 
         String levelStr = args[0].toUpperCase();
-        Level level = LogManager.parseLevel(levelStr);
+        Level level;
+        try {
+            level = Level.parse(levelStr);
+        } catch (IllegalArgumentException e) {
+            sender.sendMessage(ChatColor.RED + "Invalid log level: " + levelStr +
+                " (valid: OFF, SEVERE, WARNING, INFO, FINE, DEBUG)");
+            return true;
+        }
 
-        // Set log level for all TokenEconomy loggers
-        LogManager.setPluginLogLevel(plugin, level);
+        plugin.getLogger().setLevel(level);
 
         // Update config for persistence (use same path as onEnable)
         plugin.getConfig().set("general.logLevel", levelStr);
