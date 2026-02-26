@@ -1,6 +1,15 @@
 general:
   logLevel: WARNING
 
+# RVNKCore integration — exposes economy data to the RVNK plugin ecosystem.
+# Set enabled: false to run TokenEconomy as a fully standalone Vault economy plugin.
+integration:
+  rvnkcore:
+    enabled: true
+    # Register IEconomyService with RVNKCore ServiceRegistry so other RVNK plugins
+    # can query/modify balances without depending directly on TokenEconomy.
+    service-registry: true
+
 economy:
   currencyNameSingular: Wizbuck
   currencyNamePlural: Wizbucks

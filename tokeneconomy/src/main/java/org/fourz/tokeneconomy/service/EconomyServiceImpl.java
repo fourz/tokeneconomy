@@ -1,5 +1,6 @@
 package org.fourz.tokeneconomy.service;
 
+import org.fourz.rvnkcore.api.service.IEconomyService;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Data.DataConnector;
 
@@ -9,7 +10,8 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Implementation of IEconomyService that wraps the existing DataConnector.
- * Provides async-compatible interface for cross-plugin access via ServiceRegistry.
+ * Provides async-compatible interface for cross-plugin access via RVNKCore ServiceRegistry.
+ * Only loaded when RVNKCore integration is enabled and RVNKCore is present at runtime.
  */
 public class EconomyServiceImpl implements IEconomyService {
 

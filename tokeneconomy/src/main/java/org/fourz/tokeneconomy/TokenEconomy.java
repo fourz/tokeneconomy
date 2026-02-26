@@ -12,7 +12,6 @@ import org.fourz.tokeneconomy.Data.DataConnector;
 import org.fourz.tokeneconomy.Command.BalanceCommand;
 
 import net.milkbowl.vault.economy.Economy;
-import org.fourz.tokeneconomy.service.IEconomyService;
 import org.fourz.tokeneconomy.service.EconomyServiceImpl;
 
 import java.util.Map;
@@ -181,13 +180,24 @@ public class TokenEconomy extends JavaPlugin {
     }
 
     /**
-     * Registers IEconomyService with RVNKCore ServiceRegistry if available.
-     * Uses reflection to avoid hard dependency on RVNKCore classes.
+     * Registers IEconomyService with RVNKCore ServiceRegistry if enabled in config and available.
+     * Uses reflection to keep RVNKCore as a soft runtime dependency — TokenEconomy functions
+     * as a standalone Vault economy plugin when integration is disabled or RVNKCore is absent.
      */
     private void registerWithRVNKCore() {
+        if (!configLoader.isRvnkcoreIntegrationEnabled()) {
+            getLogger().info("RVNKCore integration disabled in config - running in standalone mode");
+            return;
+        }
+
         Plugin rvnkCorePlugin = getServer().getPluginManager().getPlugin("RVNKCore");
         if (rvnkCorePlugin == null || !rvnkCorePlugin.isEnabled()) {
             getLogger().info("RVNKCore not found - running in standalone mode");
+            return;
+        }
+
+        if (!configLoader.isRvnkcoreServiceRegistryEnabled()) {
+            getLogger().info("RVNKCore service-registry registration disabled in config");
             return;
         }
 
@@ -205,13 +215,14 @@ public class TokenEconomy extends JavaPlugin {
                 return;
             }
 
+            Class<?> serviceInterface = Class.forName("org.fourz.rvnkcore.api.service.IEconomyService");
             java.lang.reflect.Method registerMethod = serviceRegistry.getClass()
                     .getMethod("registerService", Class.class, Object.class);
-            registerMethod.invoke(serviceRegistry, IEconomyService.class, new EconomyServiceImpl(this));
+            registerMethod.invoke(serviceRegistry, serviceInterface, new EconomyServiceImpl(this));
 
             rvnkCoreAvailable = true;
             rvnkCoreInstance = coreInstance;
-            getLogger().info("Registered IEconomyService with RVNKCore");
+            getLogger().info("Registered IEconomyService with RVNKCore ServiceRegistry");
 
         } catch (ClassNotFoundException e) {
             getLogger().info("RVNKCore classes not found - running in standalone mode");
@@ -232,9 +243,10 @@ public class TokenEconomy extends JavaPlugin {
             Object serviceRegistry = rvnkCoreInstance.getClass()
                     .getMethod("getServiceRegistry").invoke(rvnkCoreInstance);
             if (serviceRegistry != null) {
+                Class<?> serviceInterface = Class.forName("org.fourz.rvnkcore.api.service.IEconomyService");
                 java.lang.reflect.Method unregisterMethod = serviceRegistry.getClass()
                         .getMethod("unregisterService", Class.class);
-                unregisterMethod.invoke(serviceRegistry, IEconomyService.class);
+                unregisterMethod.invoke(serviceRegistry, serviceInterface);
                 getLogger().info("Unregistered IEconomyService from RVNKCore");
             }
         } catch (Exception e) {

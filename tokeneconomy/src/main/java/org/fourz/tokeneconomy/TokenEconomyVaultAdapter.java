@@ -154,13 +154,12 @@ public class TokenEconomyVaultAdapter implements Economy {
         if (amount < 0) {
             return new EconomyResponse(0, getBalance(player), EconomyResponse.ResponseType.FAILURE, "Cannot withdraw negative amount");
         }
-        double current = getBalance(player);
-        if (current < amount) {
-            return new EconomyResponse(0, current, EconomyResponse.ResponseType.FAILURE, "Insufficient balance");
+        boolean success = plugin.getDataConnector().changePlayerBalance(player.getUniqueId(), -amount);
+        double balance = getBalance(player);
+        if (!success) {
+            return new EconomyResponse(0, balance, EconomyResponse.ResponseType.FAILURE, "Insufficient balance");
         }
-        double newBalance = current - amount;
-        plugin.getDataConnector().setPlayerBalance(player.getUniqueId(), newBalance);
-        return new EconomyResponse(amount, newBalance, EconomyResponse.ResponseType.SUCCESS, null);
+        return new EconomyResponse(amount, balance, EconomyResponse.ResponseType.SUCCESS, null);
     }
 
     @Override
@@ -185,9 +184,8 @@ public class TokenEconomyVaultAdapter implements Economy {
         if (amount < 0) {
             return new EconomyResponse(0, getBalance(player), EconomyResponse.ResponseType.FAILURE, "Cannot deposit negative amount");
         }
-        double newBalance = getBalance(player) + amount;
-        plugin.getDataConnector().setPlayerBalance(player.getUniqueId(), newBalance);
-        return new EconomyResponse(amount, newBalance, EconomyResponse.ResponseType.SUCCESS, null);
+        plugin.getDataConnector().changePlayerBalance(player.getUniqueId(), amount);
+        return new EconomyResponse(amount, getBalance(player), EconomyResponse.ResponseType.SUCCESS, null);
     }
 
     @Override

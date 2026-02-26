@@ -1,5 +1,5 @@
 name: TokenEconomy
-version: 1.0-SNAPSHOT
+version: '${project.version}'
 api-version: 1.21
 description: This is a simple Bukkit Plugin
 author: fourz

@@ -5,7 +5,7 @@
     
     <groupId>org.fourz</groupId>
     <artifactId>tokeneconomy</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.3</version>
     <packaging>jar</packaging>
     
     <name>TokenEconomy</name>
@@ -82,11 +82,11 @@
             <version>5.1.0</version>
         </dependency>
 
-        <!-- RVNKCore (shared testing framework) -->
+        <!-- RVNKCore (soft dependency - provides IEconomyService contract and ServiceRegistry) -->
         <dependency>
             <groupId>org.fourz</groupId>
             <artifactId>rvnkcore</artifactId>
-            <version>1.3.0-alpha</version>
+            <version>1.3.5-alpha</version>
             <scope>provided</scope>
         </dependency>
 
@@ -94,6 +94,12 @@
     
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
         <plugins>
             <!-- Compiler Plugin -->
             <plugin>
