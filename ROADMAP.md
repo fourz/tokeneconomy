@@ -1,8 +1,16 @@
 # TokenEconomy Development Roadmap
 
-**Last Updated**: February 9, 2026
+**Last Updated**: February 26, 2026
 
-## February 9, 2026 Status: Maintenance Mode (Functional)
+## February 26, 2026 — v1.1.4: Service Architecture Cleanup
+
+**Changes** (derek/dev):
+- ✅ **SetCommand race fixed** — replaced 2-step `withdrawPlayer` + `depositPlayer` with direct `DataConnector.setPlayerBalance()` UPSERT; no more zero-balance window
+- ✅ **Fake-async fixed in EconomyServiceImpl** — `CompletableFuture.completedFuture(dbCall())` replaced with `supplyAsync()`; DB work now genuinely off-thread
+- ✅ **IEconomyService trimmed** — removed 3 Vault-duplicate methods (`getBalance`, `deposit`, `withdraw`); interface now exposes only `setBalance` + `getTopBalances` (non-Vault operations)
+- ✅ **Config simplified** — removed redundant `integration.rvnkcore.service-registry` flag; `enabled: true` now implies registration
+
+## February 9, 2026 — Maintenance Mode (Functional)
 
 **Recent Activity** (derek/dev, 5419b12):
 - ✅ Runtime log level command and LogManager migration (9809c6a)
@@ -14,14 +22,14 @@
 
 **Archon Status**: No active tasks (maintenance mode)
 
-**Integration**: 
+**Integration**:
 - ✅ RVNKCore dependency
 - ✅ Vault economy provider
 - ✅ MySQL/SQLite storage backends
 
 ---
 
-## Current Status (v1.0-SNAPSHOT)
+## Current Status (v1.1.4)
 
 TokenEconomy is in maintenance mode with core functionality complete and production-ready.
 
@@ -47,6 +55,7 @@ TokenEconomy is in maintenance mode with core functionality complete and product
 - ✅ Public API for third-party plugin integration
 - ✅ TokenEconomyAPI with balance management methods
 - ✅ UUID-based player identification system
+- ✅ RVNKCore ServiceRegistry — `IEconomyService` (setBalance + getTopBalances; non-Vault operations only)
 
 ### Configuration & Customization
 - ✅ Flexible configuration system (config.yml)
