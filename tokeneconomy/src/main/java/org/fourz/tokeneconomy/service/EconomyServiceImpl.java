@@ -22,40 +22,15 @@ public class EconomyServiceImpl implements IEconomyService {
     }
 
     @Override
-    public CompletableFuture<Double> getBalance(UUID playerId) {
-        DataConnector dc = plugin.getDataConnector();
-        if (dc == null) {
-            return CompletableFuture.completedFuture(0.0);
-        }
-        return CompletableFuture.completedFuture(dc.getPlayerBalanceByUUID(playerId));
-    }
-
-    @Override
-    public CompletableFuture<Boolean> deposit(UUID playerId, double amount) {
-        DataConnector dc = plugin.getDataConnector();
-        if (dc == null || amount <= 0) {
-            return CompletableFuture.completedFuture(false);
-        }
-        return CompletableFuture.completedFuture(dc.changePlayerBalance(playerId, amount));
-    }
-
-    @Override
-    public CompletableFuture<Boolean> withdraw(UUID playerId, double amount) {
-        DataConnector dc = plugin.getDataConnector();
-        if (dc == null || amount <= 0) {
-            return CompletableFuture.completedFuture(false);
-        }
-        return CompletableFuture.completedFuture(dc.changePlayerBalance(playerId, -amount));
-    }
-
-    @Override
     public CompletableFuture<Boolean> setBalance(UUID playerId, double amount) {
         DataConnector dc = plugin.getDataConnector();
         if (dc == null || dc.getDataStore() == null) {
             return CompletableFuture.completedFuture(false);
         }
-        dc.getDataStore().setPlayerBalance(playerId, amount);
-        return CompletableFuture.completedFuture(true);
+        return CompletableFuture.supplyAsync(() -> {
+            dc.getDataStore().setPlayerBalance(playerId, amount);
+            return true;
+        });
     }
 
     @Override
@@ -64,6 +39,6 @@ public class EconomyServiceImpl implements IEconomyService {
         if (dc == null) {
             return CompletableFuture.completedFuture(Map.of());
         }
-        return CompletableFuture.completedFuture(dc.getTopBalances(limit));
+        return CompletableFuture.supplyAsync(() -> dc.getTopBalances(limit));
     }
 }
