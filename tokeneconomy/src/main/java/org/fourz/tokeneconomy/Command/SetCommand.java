@@ -27,8 +27,7 @@ public class SetCommand extends BaseCommand {
         Double amount = parseAmount(sender, args[1]);
         if (amount == null) return true;
 
-        plugin.getEconomy().withdrawPlayer(target, plugin.getPlayerBalance(target));
-        plugin.getEconomy().depositPlayer(target, amount);
+        plugin.getDataConnector().setPlayerBalance(target.getUniqueId(), amount);
         
         String formattedAmount = CurrencyFormatter.format(amount, plugin);
         sendSuccess(sender, "Set " + target.getName() + "'s balance to " + formattedAmount);
