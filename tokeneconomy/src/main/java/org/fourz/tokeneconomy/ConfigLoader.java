@@ -25,7 +25,6 @@ public class ConfigLoader {
     private boolean migrateFromSQLite;
     private String migrationStatus; // "none", "in_progress", "completed", "failed"
     private boolean rvnkcoreIntegrationEnabled;
-    private boolean rvnkcoreServiceRegistry;
 
     public ConfigLoader(TokenEconomy plugin) {
         this.plugin = plugin;
@@ -56,7 +55,6 @@ public class ConfigLoader {
         }
 
         rvnkcoreIntegrationEnabled = config.getBoolean("integration.rvnkcore.enabled", true);
-        rvnkcoreServiceRegistry = config.getBoolean("integration.rvnkcore.service-registry", true);
 
         if (storageType.equals("mysql")) {
             mysqlHost = config.getString("storage.mysql.host");
@@ -163,9 +161,5 @@ public class ConfigLoader {
 
     public boolean isRvnkcoreIntegrationEnabled() {
         return rvnkcoreIntegrationEnabled;
-    }
-
-    public boolean isRvnkcoreServiceRegistryEnabled() {
-        return rvnkcoreServiceRegistry;
     }
 }

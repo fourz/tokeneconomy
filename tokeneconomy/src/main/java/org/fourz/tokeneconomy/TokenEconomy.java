@@ -196,11 +196,6 @@ public class TokenEconomy extends JavaPlugin {
             return;
         }
 
-        if (!configLoader.isRvnkcoreServiceRegistryEnabled()) {
-            getLogger().info("RVNKCore service-registry registration disabled in config");
-            return;
-        }
-
         try {
             Class<?> rvnkCoreClass = Class.forName("org.fourz.rvnkcore.RVNKCore");
             Object coreInstance = rvnkCoreClass.getMethod("getInstance").invoke(null);

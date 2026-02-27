@@ -6,9 +6,6 @@ general:
 integration:
   rvnkcore:
     enabled: true
-    # Register IEconomyService with RVNKCore ServiceRegistry so other RVNK plugins
-    # can query/modify balances without depending directly on TokenEconomy.
-    service-registry: true
 
 economy:
   currencyNameSingular: Wizbuck
