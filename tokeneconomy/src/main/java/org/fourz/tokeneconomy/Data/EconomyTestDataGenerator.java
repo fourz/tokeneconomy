@@ -1,8 +1,5 @@
-package org.fourz.tokeneconomy.data;
+package org.fourz.tokeneconomy.Data;
 
-import org.fourz.tokeneconomy.Data.DataStore;
-import org.fourz.tokeneconomy.Data.MySQLDataStore;
-import org.fourz.tokeneconomy.Data.SQLiteDataStore;
 import org.fourz.rvnkcore.testing.TestDataGenerator;
 
 import java.sql.Connection;

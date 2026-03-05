@@ -4,7 +4,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Data.DataStore;
-import org.fourz.tokeneconomy.data.EconomyTestDataGenerator;
+import org.fourz.tokeneconomy.Data.EconomyTestDataGenerator;
 import org.fourz.rvnkcore.testing.TestDataGenerator.DataCategory;
 
 import java.util.ArrayList;
