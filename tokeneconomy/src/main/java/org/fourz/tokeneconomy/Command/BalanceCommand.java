@@ -7,12 +7,12 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 import org.fourz.tokeneconomy.TokenEconomy;
-import org.fourz.tokeneconomy.util.CurrencyFormatter;
+import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class BalanceCommand extends BaseCommand implements TabCompleter {
+public class BalanceCommand extends BaseCommand {
     public BalanceCommand(TokenEconomy plugin) {
         super(plugin);
     }
@@ -52,7 +52,7 @@ public class BalanceCommand extends BaseCommand implements TabCompleter {
         }
 
         double balance = plugin.getPlayerBalance(targetPlayer);
-        String formattedBalance = CurrencyFormatter.format(balance, plugin);
+        String formattedBalance = CurrencyFormatter.format(balance, plugin, true);
         sender.sendMessage(ChatColor.GREEN + targetPlayer.getName() + "'s balance: " + formattedBalance);
         return true;
     }

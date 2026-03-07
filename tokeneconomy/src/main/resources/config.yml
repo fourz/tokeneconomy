@@ -1,7 +1,17 @@
+general:
+  logLevel: WARNING
+
+# RVNKCore integration — exposes economy data to the RVNK plugin ecosystem.
+# Set enabled: false to run TokenEconomy as a fully standalone Vault economy plugin.
+integration:
+  rvnkcore:
+    enabled: true
+
 economy:
   currencyNameSingular: Wizbuck
   currencyNamePlural: Wizbucks
-  currencySymbol: WB
+  currencySymbol: 'W'
+  migrate_old_economy: false
   payCommandInsufficientFundsMessage: "You do not have enough {currencyName} to pay that amount."
   payCommandInvalidAmountMessage: "Invalid amount. Please enter a valid number."
   payCommandInvalidPlayerMessage: "Invalid player. Please enter a valid player name."
@@ -10,3 +20,24 @@ economy:
   payCommandReceiveMessageOffline: "{player} has paid you {amount} {currencyName} while you were offline."
   payCommandReceiveMessageSelf: "You cannot pay yourself."
   payCommandNoPermissionMessage: "{currencyName} are non-transferable between players."
+
+storage:
+  type: sqlite
+  migrate_from_mysql: false
+  migrate_from_sqlite: false
+  migration_status: none
+  mysql:
+    host: localhost
+    port: 3306
+    username: root
+    password: ''
+    useSSL: false
+    database:
+    tablePrefix: token_
+    connectionTimeout: 5000
+    maxRetries: 3
+    retryDelay: 2000
+  sqlite:
+    database: data.db
+    # Table prefix for shared database hosting (e.g., "token_" creates "token_economy")
+    tablePrefix: ""

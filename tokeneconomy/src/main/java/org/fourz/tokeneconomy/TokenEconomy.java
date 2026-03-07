@@ -8,31 +8,45 @@ import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.tokeneconomy.Command.EconomyCommand;
 import org.fourz.tokeneconomy.Command.PayCommand;
+import org.fourz.tokeneconomy.Data.DataConnector;
 import org.fourz.tokeneconomy.Command.BalanceCommand;
 
 import net.milkbowl.vault.economy.Economy;
+import org.fourz.tokeneconomy.service.EconomyServiceImpl;
 
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.logging.Level;
 
 public class TokenEconomy extends JavaPlugin {
     // These components are separated to maintain single responsibility principle and improve maintainability
     private ConfigLoader configLoader;
     private DataConnector dataConnector;
     private Map<String, Double> playerBalances = new LinkedHashMap<>();
+    private boolean rvnkCoreAvailable = false;
+    private Object rvnkCoreInstance = null;
 
     @Override
     public void onEnable() {
-        // Wrapped in try-catch to prevent catastrophic failures and provide detailed error logging for troubleshooting
         try {
-            getLogger().info("Initializing TokenEconomy...");
-            
             // Save default config if it doesn't exist
             saveDefaultConfig();
-            
+
             // Initialize configuration first
             configLoader = new ConfigLoader(this);
             configLoader.loadConfig();
+
+            // Apply log level from config
+            String logLevelStr = getConfig().getString("general.logLevel", "INFO");
+            try {
+                Level logLevel = Level.parse(logLevelStr.toUpperCase());
+                getLogger().setLevel(logLevel);
+            } catch (IllegalArgumentException e) {
+                getLogger().warning("Invalid log level in config: " + logLevelStr);
+            }
+
+            getLogger().info("Enabling TokenEconomy...");
+            getLogger().info("Initializing TokenEconomy...");
             
             // Initialize Vault after config is loaded
             if (!setupVault()) {
@@ -50,6 +64,11 @@ public class TokenEconomy extends JavaPlugin {
             registerCommands();
             registerGriefProtectionHook();
 
+            TokenEconomyAPI.init(this);
+
+            // Register with RVNKCore ServiceRegistry if available
+            registerWithRVNKCore();
+
             getLogger().info("TokenEconomy successfully enabled!");
         } catch (Exception e) {
             getLogger().severe("An error occurred while enabling TokenEconomy: " + e.getMessage());
@@ -63,8 +82,10 @@ public class TokenEconomy extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // Critical to prevent data loss by ensuring all transactions are saved before shutdown
         try {
+            // Unregister from RVNKCore first
+            unregisterFromRVNKCore();
+
             getLogger().info("Disabling TokenEconomy...");
             if (dataConnector != null) {
                 // Save and close database
@@ -156,5 +177,78 @@ public class TokenEconomy extends JavaPlugin {
 
     public Map<String, Double> getTopBalances() {
         return dataConnector.getTopBalances(15); // Default limit of 15
+    }
+
+    /**
+     * Registers IEconomyService with RVNKCore ServiceRegistry if enabled in config and available.
+     * Uses reflection to keep RVNKCore as a soft runtime dependency — TokenEconomy functions
+     * as a standalone Vault economy plugin when integration is disabled or RVNKCore is absent.
+     */
+    private void registerWithRVNKCore() {
+        if (!configLoader.isRvnkcoreIntegrationEnabled()) {
+            getLogger().info("RVNKCore integration disabled in config - running in standalone mode");
+            return;
+        }
+
+        Plugin rvnkCorePlugin = getServer().getPluginManager().getPlugin("RVNKCore");
+        if (rvnkCorePlugin == null || !rvnkCorePlugin.isEnabled()) {
+            getLogger().info("RVNKCore not found - running in standalone mode");
+            return;
+        }
+
+        try {
+            Class<?> rvnkCoreClass = Class.forName("org.fourz.rvnkcore.RVNKCore");
+            Object coreInstance = rvnkCoreClass.getMethod("getInstance").invoke(null);
+            if (coreInstance == null) {
+                getLogger().warning("RVNKCore instance is null - service not registered");
+                return;
+            }
+
+            Object serviceRegistry = rvnkCoreClass.getMethod("getServiceRegistry").invoke(coreInstance);
+            if (serviceRegistry == null) {
+                getLogger().warning("RVNKCore ServiceRegistry is null - service not registered");
+                return;
+            }
+
+            Class<?> serviceInterface = Class.forName("org.fourz.rvnkcore.api.service.IEconomyService");
+            java.lang.reflect.Method registerMethod = serviceRegistry.getClass()
+                    .getMethod("registerService", Class.class, Object.class);
+            registerMethod.invoke(serviceRegistry, serviceInterface, new EconomyServiceImpl(this));
+
+            rvnkCoreAvailable = true;
+            rvnkCoreInstance = coreInstance;
+            getLogger().info("Registered IEconomyService with RVNKCore ServiceRegistry");
+
+        } catch (ClassNotFoundException e) {
+            getLogger().info("RVNKCore classes not found - running in standalone mode");
+        } catch (Exception e) {
+            getLogger().warning("Failed to register with RVNKCore: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Unregisters IEconomyService from RVNKCore ServiceRegistry.
+     */
+    private void unregisterFromRVNKCore() {
+        if (!rvnkCoreAvailable || rvnkCoreInstance == null) {
+            return;
+        }
+
+        try {
+            Object serviceRegistry = rvnkCoreInstance.getClass()
+                    .getMethod("getServiceRegistry").invoke(rvnkCoreInstance);
+            if (serviceRegistry != null) {
+                Class<?> serviceInterface = Class.forName("org.fourz.rvnkcore.api.service.IEconomyService");
+                java.lang.reflect.Method unregisterMethod = serviceRegistry.getClass()
+                        .getMethod("unregisterService", Class.class);
+                unregisterMethod.invoke(serviceRegistry, serviceInterface);
+                getLogger().info("Unregistered IEconomyService from RVNKCore");
+            }
+        } catch (Exception e) {
+            getLogger().warning("Failed to unregister from RVNKCore: " + e.getMessage());
+        }
+
+        rvnkCoreAvailable = false;
+        rvnkCoreInstance = null;
     }
 }
