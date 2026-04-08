@@ -1,6 +1,9 @@
 package org.fourz.tokeneconomy.Data;
 
 import org.bukkit.plugin.Plugin;
+import org.fourz.rvnkcore.database.config.DatabaseConfig;
+import org.fourz.rvnkcore.database.connection.ConnectionProvider;
+import org.fourz.rvnkcore.database.connection.ConnectionProviderFactory;
 import org.fourz.tokeneconomy.ConfigLoader;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.bukkit.entity.Player;
@@ -12,11 +15,10 @@ import java.util.logging.Logger;
 
 /**
  * Handles all database operations for the TokenEconomy plugin.
- * Uses SQLite for persistent storage of player balances.
+ * Delegates connection management to RVNKCore's ConnectionProvider.
  */
 public class DataConnector {
 
-    private final File dbPath;
     private final Logger logger;
     private final Plugin plugin;
     private final ConfigLoader configLoader;
@@ -35,15 +37,16 @@ public class DataConnector {
                 logger.info("Starting migration from MySQL to SQLite.");
                 configLoader.setMigrationStatus("in_progress");
                 try {
-                    DataStore sourceStore = new MySQLDataStore(configLoader, plugin);
+                    DataStore sourceStore = new MySQLDataStore(createProvider("mysql"), configLoader, plugin);
                     DataStore targetStore = new SQLiteDataStore(
+                        createProvider("sqlite"),
                         new File(plugin.getDataFolder(), "database.db"), configLoader, plugin);
-                    
+
                     // Test source connection before proceeding
                     if (!testConnection(sourceStore)) {
                         throw new SQLException("Could not establish connection to source MySQL database");
                     }
-                    
+
                     sourceStore.setupDatabase();
                     targetStore.setupDatabase();
                     migrateData(sourceStore, targetStore);
@@ -79,14 +82,15 @@ public class DataConnector {
                 configLoader.setMigrationStatus("in_progress");
                 try {
                     DataStore sourceStore = new SQLiteDataStore(
+                        createProvider("sqlite"),
                         new File(plugin.getDataFolder(), "database.db"), configLoader, plugin);
-                    MySQLDataStore targetStore = new MySQLDataStore(configLoader, plugin);
-                    
+                    DataStore targetStore = new MySQLDataStore(createProvider("mysql"), configLoader, plugin);
+
                     // Test target connection before proceeding
                     if (!testConnection(targetStore)) {
                         throw new SQLException("Could not establish connection to target MySQL database");
                     }
-                    
+
                     sourceStore.setupDatabase();
                     targetStore.setupDatabase();
                     migrateData(sourceStore, targetStore);
@@ -122,18 +126,41 @@ public class DataConnector {
         // Initialize dataStore based on the (possibly updated) storageType
         switch (storageType) {
             case "mysql":
-                this.dbPath = null;            
-                dataStore = new MySQLDataStore(configLoader, plugin);
-                break;        
+                dataStore = new MySQLDataStore(createProvider("mysql"), configLoader, plugin);
+                break;
             case "sqlite":
-                this.dbPath = new File(plugin.getDataFolder(), "database.db");            
-                dataStore = new SQLiteDataStore(dbPath, configLoader, plugin);            
+                dataStore = new SQLiteDataStore(
+                    createProvider("sqlite"),
+                    new File(plugin.getDataFolder(), "database.db"), configLoader, plugin);
                 break;
             default:
-                this.dbPath = null;
                 logger.severe("Invalid storage type in config.yml: " + storageType);
                 break;
-        }        
+        }
+    }
+
+    /**
+     * Creates a ConnectionProvider for the given storage type using RVNKCore's factory.
+     */
+    private ConnectionProvider createProvider(String storageType) {
+        ConnectionProviderFactory factory = new ConnectionProviderFactory(plugin);
+        DatabaseConfig config;
+        if ("mysql".equals(storageType)) {
+            config = DatabaseConfig.builder()
+                .type("mysql")
+                .host(configLoader.getMySQLHost())
+                .port(configLoader.getMySQLPort())
+                .database(configLoader.getMySQLDatabase())
+                .username(configLoader.getMySQLUsername())
+                .password(configLoader.getMySQLPassword())
+                .useSSL(configLoader.getMySQLUseSSL())
+                .connectionTimeoutMs(configLoader.getMySQLConnectionTimeout() > 0
+                    ? configLoader.getMySQLConnectionTimeout() * 1000L : 30000L)
+                .build();
+        } else {
+            config = DatabaseConfig.sqlite("database.db");
+        }
+        return factory.createConnectionProvider(config);
     }
 
     /**
@@ -277,13 +304,13 @@ public class DataConnector {
                 }
             }
             logger.info("Data migration completed. Successfully migrated: " + migratedPlayers + "/" + totalPlayers + " player balances");
-            
+
             if (migratedPlayers < totalPlayers) {
                 logger.warning("Some player data failed to migrate. Check logs for details.");
             }
         } catch (SQLException e) {
             logger.severe("Migration failed due to database error: " + e.getMessage());
-            logger.severe("Database State - Source connected: " + connectionStatus(sourceStore) + 
+            logger.severe("Database State - Source connected: " + connectionStatus(sourceStore) +
                          ", Target connected: " + connectionStatus(targetStore));
             throw new RuntimeException("Migration failed", e);
         }
