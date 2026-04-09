@@ -1,5 +1,11 @@
 general:
-  logLevel: INFO
+  logLevel: WARNING
+
+# RVNKCore integration — exposes economy data to the RVNK plugin ecosystem.
+# Set enabled: false to run TokenEconomy as a fully standalone Vault economy plugin.
+integration:
+  rvnkcore:
+    enabled: true
 
 economy:
   currencyNameSingular: Wizbuck

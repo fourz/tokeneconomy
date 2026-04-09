@@ -1,8 +1,41 @@
+> **DEPRECATED — March 2026**: Status is now tracked in Docker MCP knowledge graph
+> (`mcp__MCP_DOCKER__search_nodes("TokenEconomy")`). Open tasks tracked in GitHub Issues (`board:token-economy`).
+> This file is preserved as historical reference only and is no longer actively maintained.
+
 # TokenEconomy Development Roadmap
 
-## Current Status (v1.0-SNAPSHOT)
+**Last Updated**: February 26, 2026
 
-TokenEconomy is in active development with core functionality implemented and being refined for production use.
+## February 26, 2026 — v1.1.4: Service Architecture Cleanup
+
+**Changes** (derek/dev):
+- ✅ **SetCommand race fixed** — replaced 2-step `withdrawPlayer` + `depositPlayer` with direct `DataConnector.setPlayerBalance()` UPSERT; no more zero-balance window
+- ✅ **Fake-async fixed in EconomyServiceImpl** — `CompletableFuture.completedFuture(dbCall())` replaced with `supplyAsync()`; DB work now genuinely off-thread
+- ✅ **IEconomyService trimmed** — removed 3 Vault-duplicate methods (`getBalance`, `deposit`, `withdraw`); interface now exposes only `setBalance` + `getTopBalances` (non-Vault operations)
+- ✅ **Config simplified** — removed redundant `integration.rvnkcore.service-registry` flag; `enabled: true` now implies registration
+
+## February 9, 2026 — Maintenance Mode (Functional)
+
+**Recent Activity** (derek/dev, 5419b12):
+- ✅ Runtime log level command and LogManager migration (9809c6a)
+- ✅ SeedCommand and test data generator (fe682e4)
+- ✅ Documentation cleanup, shared/derek directories removed (5419b12)
+- ✅ Table prefix support for shared MySQL hosting (65539a0)
+
+**Project Status**: **Paused/Functional** - Simple economy plugin for vote token rewards only. Core features complete, maintenance updates as needed.
+
+**Archon Status**: No active tasks (maintenance mode)
+
+**Integration**:
+- ✅ RVNKCore dependency
+- ✅ Vault economy provider
+- ✅ MySQL/SQLite storage backends
+
+---
+
+## Current Status (v1.1.4)
+
+TokenEconomy is in maintenance mode with core functionality complete and production-ready.
 
 ## Completed Features ✅
 
@@ -26,6 +59,7 @@ TokenEconomy is in active development with core functionality implemented and be
 - ✅ Public API for third-party plugin integration
 - ✅ TokenEconomyAPI with balance management methods
 - ✅ UUID-based player identification system
+- ✅ RVNKCore ServiceRegistry — `IEconomyService` (setBalance + getTopBalances; non-Vault operations only)
 
 ### Configuration & Customization
 - ✅ Flexible configuration system (config.yml)

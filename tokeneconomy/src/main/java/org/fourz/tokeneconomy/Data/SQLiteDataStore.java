@@ -9,12 +9,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.fourz.rvnkcore.util.log.LogManager;
 import org.fourz.tokeneconomy.ConfigLoader;
+
+import java.util.logging.Logger;
 
 public class SQLiteDataStore implements DataStore {
     private Connection connection;
-    private final LogManager logger;
+    private final Logger logger;
     private final File dbPath;
     private final ConfigLoader configLoader;
     private final Plugin plugin;
@@ -25,7 +26,7 @@ public class SQLiteDataStore implements DataStore {
         this.dbPath = dbPath;
         this.configLoader = configLoader;
         this.plugin = plugin;
-        this.logger = LogManager.getInstance(plugin, "SQLiteDataStore");
+        this.logger = plugin.getLogger();
 
         // Load table prefix from config
         this.tablePrefix = plugin.getConfig().getString("storage.sqlite.tablePrefix", "");
@@ -63,7 +64,7 @@ public class SQLiteDataStore implements DataStore {
             createEconomyTable();
             logger.info("SQLite database setup successful.");
         } catch (SQLException e) {
-            logger.error("SQLite database setup failed: " + e.getMessage());
+            logger.severe("SQLite database setup failed: " + e.getMessage());
             e.printStackTrace();
         }
     }
@@ -72,7 +73,7 @@ public class SQLiteDataStore implements DataStore {
         try {
             connection.close();
         } catch (SQLException e) {
-            logger.error("Failed to save SQLite database: " + e.getMessage());
+            logger.severe("Failed to save SQLite database: " + e.getMessage());
         }
     }
 
@@ -80,7 +81,7 @@ public class SQLiteDataStore implements DataStore {
         try {
             connection.close();
         } catch (SQLException e) {
-            logger.error("Failed to close SQLite database: " + e.getMessage());
+            logger.severe("Failed to close SQLite database: " + e.getMessage());
         }
     }
 
@@ -115,11 +116,38 @@ public class SQLiteDataStore implements DataStore {
     }
 
     public boolean changePlayerBalance(UUID playerUUID, double amount) {
-        try (PreparedStatement stmt = connection.prepareStatement(
-                "UPDATE " + ECONOMY_TABLE + " SET BALANCE = BALANCE + ? WHERE UUID = ?")) {
-            stmt.setDouble(1, amount);
-            stmt.setString(2, playerUUID.toString());
-            return stmt.executeUpdate() > 0;
+        try {
+            // Atomic: only updates if result would be non-negative
+            try (PreparedStatement update = connection.prepareStatement(
+                    "UPDATE " + ECONOMY_TABLE + " SET BALANCE = BALANCE + ? WHERE UUID = ? AND BALANCE + ? >= 0")) {
+                update.setDouble(1, amount);
+                update.setString(2, playerUUID.toString());
+                update.setDouble(3, amount);
+                if (update.executeUpdate() > 0) {
+                    return true;
+                }
+            }
+            // 0 rows: player doesn't exist OR insufficient balance — check which
+            try (PreparedStatement check = connection.prepareStatement(
+                    "SELECT 1 FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
+                check.setString(1, playerUUID.toString());
+                try (ResultSet rs = check.executeQuery()) {
+                    if (rs.next()) {
+                        return false; // exists but insufficient balance
+                    }
+                }
+            }
+            // Player not found: only allow non-negative initial balance
+            if (amount < 0) {
+                return false;
+            }
+            try (PreparedStatement insert = connection.prepareStatement(
+                    "INSERT OR IGNORE INTO " + ECONOMY_TABLE + " (UUID, BALANCE) VALUES (?, ?)")) {
+                insert.setString(1, playerUUID.toString());
+                insert.setDouble(2, amount);
+                insert.executeUpdate();
+                return true;
+            }
         } catch (SQLException e) {
             logger.warning("Failed to change player balance: " + e.getMessage());
             return false;
@@ -215,6 +243,19 @@ public class SQLiteDataStore implements DataStore {
             }
         } catch (SQLException e) {
             logger.warning("Failed to check player existence: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public boolean playerExistsByUUID(UUID uuid) {
+        try (PreparedStatement stmt = connection.prepareStatement(
+                "SELECT 1 FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
+            stmt.setString(1, uuid.toString());
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            logger.warning("Failed to check player existence by UUID: " + e.getMessage());
             return false;
         }
     }

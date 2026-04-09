@@ -5,7 +5,7 @@
     
     <groupId>org.fourz</groupId>
     <artifactId>tokeneconomy</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.1.4</version>
     <packaging>jar</packaging>
     
     <name>TokenEconomy</name>
@@ -75,18 +75,32 @@
             <version>3.47.1.0</version>
         </dependency>
 
-        <!-- RVNKCore (shared testing framework) -->
+        <!-- HikariCP Connection Pool (MySQL) -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>5.1.0</version>
+        </dependency>
+
+        <!-- RVNKCore (soft dependency - provides IEconomyService contract and ServiceRegistry) -->
         <dependency>
             <groupId>org.fourz</groupId>
             <artifactId>rvnkcore</artifactId>
-            <version>1.3.0-alpha</version>
+            <version>1.3.5-alpha</version>
             <scope>provided</scope>
         </dependency>
 
     </dependencies>
     
     <build>
+        <finalName>${project.artifactId}</finalName>
         <sourceDirectory>src/main/java</sourceDirectory>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
         <plugins>
             <!-- Compiler Plugin -->
             <plugin>
@@ -110,6 +124,36 @@
                         </manifest>
                     </archive>
                 </configuration>
+            </plugin>
+            <!-- Shade Plugin - bundle HikariCP + SQLite into fat JAR -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <relocations>
+                                <relocation>
+                                    <pattern>com.zaxxer.hikari</pattern>
+                                    <shadedPattern>org.fourz.tokeneconomy.lib.hikari</shadedPattern>
+                                </relocation>
+                            </relocations>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

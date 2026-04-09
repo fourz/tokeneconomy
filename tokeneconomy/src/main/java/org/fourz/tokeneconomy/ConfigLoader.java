@@ -2,13 +2,11 @@ package org.fourz.tokeneconomy;
 
 // Standard imports for configuration handling
 import org.bukkit.configuration.file.FileConfiguration;
-import org.fourz.rvnkcore.util.log.LogManager;
 import java.io.File;
 
 public class ConfigLoader {
     // Core plugin reference and currency naming fields
     private final TokenEconomy plugin;
-    private final LogManager logger;
     private String currencyNameSingular;
     private String currencyNamePlural;
     private String currencySymbol;
@@ -26,10 +24,10 @@ public class ConfigLoader {
     private boolean migrateFromMySQL;
     private boolean migrateFromSQLite;
     private String migrationStatus; // "none", "in_progress", "completed", "failed"
+    private boolean rvnkcoreIntegrationEnabled;
 
     public ConfigLoader(TokenEconomy plugin) {
         this.plugin = plugin;
-        this.logger = LogManager.getInstance(plugin);
     }
 
     public void loadConfig() {
@@ -56,6 +54,8 @@ public class ConfigLoader {
             plugin.saveConfig();
         }
 
+        rvnkcoreIntegrationEnabled = config.getBoolean("integration.rvnkcore.enabled", true);
+
         if (storageType.equals("mysql")) {
             mysqlHost = config.getString("storage.mysql.host");
             mysqlPort = config.getInt("storage.mysql.port", 3306);
@@ -69,8 +69,8 @@ public class ConfigLoader {
             mysqlRetryDelay = config.getInt("storage.mysql.retryDelay", 2000);
             
             // Log MySQL configuration (excluding sensitive data)
-            logger.info(String.format(
-                "MySQL Configuration: host=%s, port=%d, database=%s, useSSL=%s", 
+            plugin.getLogger().info(String.format(
+                "MySQL Configuration: host=%s, port=%d, database=%s, useSSL=%s",
                 mysqlHost, mysqlPort, mysqlDatabase, mysqlUseSSL));
         }
     }
@@ -157,5 +157,9 @@ public class ConfigLoader {
         migrationStatus = status;
         plugin.getConfig().set("storage.migration_status", status);
         plugin.saveConfig();
+    }
+
+    public boolean isRvnkcoreIntegrationEnabled() {
+        return rvnkcoreIntegrationEnabled;
     }
 }

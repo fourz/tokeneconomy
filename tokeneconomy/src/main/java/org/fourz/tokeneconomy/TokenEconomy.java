@@ -12,7 +12,7 @@ import org.fourz.tokeneconomy.Data.DataConnector;
 import org.fourz.tokeneconomy.Command.BalanceCommand;
 
 import net.milkbowl.vault.economy.Economy;
-import org.fourz.rvnkcore.util.log.LogManager;
+import org.fourz.tokeneconomy.service.EconomyServiceImpl;
 
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -22,15 +22,13 @@ public class TokenEconomy extends JavaPlugin {
     // These components are separated to maintain single responsibility principle and improve maintainability
     private ConfigLoader configLoader;
     private DataConnector dataConnector;
-    private LogManager logger;
     private Map<String, Double> playerBalances = new LinkedHashMap<>();
+    private boolean rvnkCoreAvailable = false;
+    private Object rvnkCoreInstance = null;
 
     @Override
     public void onEnable() {
         try {
-            // Initialize LogManager early
-            this.logger = LogManager.getInstance(this);
-
             // Save default config if it doesn't exist
             saveDefaultConfig();
 
@@ -40,15 +38,19 @@ public class TokenEconomy extends JavaPlugin {
 
             // Apply log level from config
             String logLevelStr = getConfig().getString("general.logLevel", "INFO");
-            Level logLevel = LogManager.parseLevel(logLevelStr);
-            LogManager.setPluginLogLevel(this, logLevel);
+            try {
+                Level logLevel = Level.parse(logLevelStr.toUpperCase());
+                getLogger().setLevel(logLevel);
+            } catch (IllegalArgumentException e) {
+                getLogger().warning("Invalid log level in config: " + logLevelStr);
+            }
 
-            logger.info("Enabling TokenEconomy...");
-            logger.info("Initializing TokenEconomy...");
+            getLogger().info("Enabling TokenEconomy...");
+            getLogger().info("Initializing TokenEconomy...");
             
             // Initialize Vault after config is loaded
             if (!setupVault()) {
-                logger.error("Vault not found! TokenEconomy cannot function as an economy plugin.");
+                getLogger().severe("Vault not found! TokenEconomy cannot function as an economy plugin.");
                 getServer().getPluginManager().disablePlugin(this);
                 return;
             }            
@@ -56,7 +58,7 @@ public class TokenEconomy extends JavaPlugin {
             // Setup database
             dataConnector = new DataConnector(this);
             dataConnector.setupDatabase();
-            logger.info("Database setup complete.");
+            getLogger().info("Database setup complete.");
 
             // Register commands and hooks
             registerCommands();
@@ -64,13 +66,16 @@ public class TokenEconomy extends JavaPlugin {
 
             TokenEconomyAPI.init(this);
 
-            logger.info("TokenEconomy successfully enabled!");
+            // Register with RVNKCore ServiceRegistry if available
+            registerWithRVNKCore();
+
+            getLogger().info("TokenEconomy successfully enabled!");
         } catch (Exception e) {
-            logger.error("An error occurred while enabling TokenEconomy: " + e.getMessage());
+            getLogger().severe("An error occurred while enabling TokenEconomy: " + e.getMessage());
             e.printStackTrace();
-            logger.error("Stack Trace: ");
+            getLogger().severe("Stack Trace: ");
             for (StackTraceElement element : e.getStackTrace()) {
-                logger.error(element.toString());
+                getLogger().severe(element.toString());
             }
         }
     }
@@ -78,23 +83,25 @@ public class TokenEconomy extends JavaPlugin {
     @Override
     public void onDisable() {
         try {
-            logger.info("Disabling TokenEconomy...");
-            logger.info("Disabling TokenEconomy...");
+            // Unregister from RVNKCore first
+            unregisterFromRVNKCore();
+
+            getLogger().info("Disabling TokenEconomy...");
             if (dataConnector != null) {
                 // Save and close database
                 dataConnector.saveDatabase();
                 dataConnector.closeDatabase();
             }
         } catch (Exception e) {
-            logger.error("An error occurred while disabling TokenEconomy: " + e.getMessage());
+            getLogger().severe("An error occurred while disabling TokenEconomy: " + e.getMessage());
             e.printStackTrace();
-            logger.error("Stack Trace: ");
+            getLogger().severe("Stack Trace: ");
             for (StackTraceElement element : e.getStackTrace()) {
-                logger.error(element.toString());
+                getLogger().severe(element.toString());
             }
         }
 
-        logger.info("TokenEconomy successfully disabled.");
+        getLogger().info("TokenEconomy successfully disabled.");
     }
 
     // Remove redundant loadConfig() method since it's now handled by ConfigLoader
@@ -106,7 +113,7 @@ public class TokenEconomy extends JavaPlugin {
             return false;
         }
         getServer().getServicesManager().register(Economy.class, new TokenEconomyVaultAdapter(this), this, ServicePriority.Normal);
-        logger.info("TokenEconomy registered as a Vault economy provider.");
+        getLogger().info("TokenEconomy registered as a Vault economy provider.");
         return true;
     }
 
@@ -121,16 +128,16 @@ public class TokenEconomy extends JavaPlugin {
         if (getCommand("pay") != null) {
             getCommand("pay").setExecutor(new PayCommand(this));
         }
-        logger.info("Commands registered successfully.");
+        getLogger().info("Commands registered successfully.");
     }
 
     private void registerGriefProtectionHook() {
         // Integrates with GriefPrevention plugin for land claim features
         if (Bukkit.getPluginManager().isPluginEnabled("GriefPrevention")) {
-            logger.info("GriefPrevention found! Integrating land claim support.");
+            getLogger().info("GriefPrevention found! Integrating land claim support.");
             // Add GriefPrevention-related hooks here
         } else {
-            logger.warning("GriefPrevention not found. Land claim features disabled.");
+            getLogger().warning("GriefPrevention not found. Land claim features disabled.");
         }
     }
 
@@ -170,5 +177,78 @@ public class TokenEconomy extends JavaPlugin {
 
     public Map<String, Double> getTopBalances() {
         return dataConnector.getTopBalances(15); // Default limit of 15
+    }
+
+    /**
+     * Registers IEconomyService with RVNKCore ServiceRegistry if enabled in config and available.
+     * Uses reflection to keep RVNKCore as a soft runtime dependency — TokenEconomy functions
+     * as a standalone Vault economy plugin when integration is disabled or RVNKCore is absent.
+     */
+    private void registerWithRVNKCore() {
+        if (!configLoader.isRvnkcoreIntegrationEnabled()) {
+            getLogger().info("RVNKCore integration disabled in config - running in standalone mode");
+            return;
+        }
+
+        Plugin rvnkCorePlugin = getServer().getPluginManager().getPlugin("RVNKCore");
+        if (rvnkCorePlugin == null || !rvnkCorePlugin.isEnabled()) {
+            getLogger().info("RVNKCore not found - running in standalone mode");
+            return;
+        }
+
+        try {
+            Class<?> rvnkCoreClass = Class.forName("org.fourz.rvnkcore.RVNKCore");
+            Object coreInstance = rvnkCoreClass.getMethod("getInstance").invoke(null);
+            if (coreInstance == null) {
+                getLogger().warning("RVNKCore instance is null - service not registered");
+                return;
+            }
+
+            Object serviceRegistry = rvnkCoreClass.getMethod("getServiceRegistry").invoke(coreInstance);
+            if (serviceRegistry == null) {
+                getLogger().warning("RVNKCore ServiceRegistry is null - service not registered");
+                return;
+            }
+
+            Class<?> serviceInterface = Class.forName("org.fourz.rvnkcore.api.service.IEconomyService");
+            java.lang.reflect.Method registerMethod = serviceRegistry.getClass()
+                    .getMethod("registerService", Class.class, Object.class);
+            registerMethod.invoke(serviceRegistry, serviceInterface, new EconomyServiceImpl(this));
+
+            rvnkCoreAvailable = true;
+            rvnkCoreInstance = coreInstance;
+            getLogger().info("Registered IEconomyService with RVNKCore ServiceRegistry");
+
+        } catch (ClassNotFoundException e) {
+            getLogger().info("RVNKCore classes not found - running in standalone mode");
+        } catch (Exception e) {
+            getLogger().warning("Failed to register with RVNKCore: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Unregisters IEconomyService from RVNKCore ServiceRegistry.
+     */
+    private void unregisterFromRVNKCore() {
+        if (!rvnkCoreAvailable || rvnkCoreInstance == null) {
+            return;
+        }
+
+        try {
+            Object serviceRegistry = rvnkCoreInstance.getClass()
+                    .getMethod("getServiceRegistry").invoke(rvnkCoreInstance);
+            if (serviceRegistry != null) {
+                Class<?> serviceInterface = Class.forName("org.fourz.rvnkcore.api.service.IEconomyService");
+                java.lang.reflect.Method unregisterMethod = serviceRegistry.getClass()
+                        .getMethod("unregisterService", Class.class);
+                unregisterMethod.invoke(serviceRegistry, serviceInterface);
+                getLogger().info("Unregistered IEconomyService from RVNKCore");
+            }
+        } catch (Exception e) {
+            getLogger().warning("Failed to unregister from RVNKCore: " + e.getMessage());
+        }
+
+        rvnkCoreAvailable = false;
+        rvnkCoreInstance = null;
     }
 }

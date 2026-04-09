@@ -4,10 +4,8 @@ import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Data.DataStore;
-import org.fourz.tokeneconomy.data.EconomyTestDataGenerator;
+import org.fourz.tokeneconomy.Data.EconomyTestDataGenerator;
 import org.fourz.rvnkcore.testing.TestDataGenerator.DataCategory;
-
-import org.fourz.rvnkcore.util.log.LogManager;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,13 +29,11 @@ public class SeedCommand extends BaseCommand {
 
     private static final List<String> ACTIONS = Arrays.asList("minimal", "standard", "stress", "cleanup", "status", "legacy");
 
-    private final LogManager logger;
     private EconomyTestDataGenerator generator;
     private boolean seeding = false;
 
     public SeedCommand(TokenEconomy plugin) {
         super(plugin);
-        this.logger = LogManager.getInstance(plugin);
     }
 
     @Override
@@ -126,7 +122,7 @@ public class SeedCommand extends BaseCommand {
         }).exceptionally(ex -> {
             seeding = false;
             sender.sendMessage(ChatColor.RED + "Seed failed: " + ex.getMessage());
-            logger.error("Seed operation failed: " + ex.getMessage());
+            plugin.getLogger().severe("Seed operation failed: " + ex.getMessage());
             return null;
         });
 
@@ -152,7 +148,7 @@ public class SeedCommand extends BaseCommand {
         }).exceptionally(ex -> {
             seeding = false;
             sender.sendMessage(ChatColor.RED + "Legacy seed failed: " + ex.getMessage());
-            logger.error("Legacy seed operation failed: " + ex.getMessage());
+            plugin.getLogger().severe("Legacy seed operation failed: " + ex.getMessage());
             return null;
         });
 
@@ -178,7 +174,7 @@ public class SeedCommand extends BaseCommand {
         }).exceptionally(ex -> {
             seeding = false;
             sender.sendMessage(ChatColor.RED + "Cleanup failed: " + ex.getMessage());
-            logger.error("Cleanup operation failed: " + ex.getMessage());
+            plugin.getLogger().severe("Cleanup operation failed: " + ex.getMessage());
             return null;
         });
 
@@ -208,7 +204,7 @@ public class SeedCommand extends BaseCommand {
         }).exceptionally(ex -> {
             seeding = false;
             sender.sendMessage(ChatColor.RED + "Cleanup failed: " + ex.getMessage());
-            logger.error("Player cleanup operation failed: " + ex.getMessage());
+            plugin.getLogger().severe("Player cleanup operation failed: " + ex.getMessage());
             return null;
         });
 
