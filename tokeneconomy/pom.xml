@@ -13,7 +13,7 @@
     <url>https://your-repo-url-here</url>
     
     <properties>
-        <java.version>22</java.version>
+        <java.version>21</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
