@@ -1,42 +1,27 @@
 package org.fourz.tokeneconomy.Data;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
-
 import java.sql.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.tokeneconomy.ConfigLoader;
 
 import java.util.logging.Logger;
 
 public class MySQLDataStore implements DataStore {
-    private HikariDataSource dataSource;
+    private final ConnectionProvider connectionProvider;
     private final Logger logger;
-    private final String host;
-    private final int port;
-    private final String database;
-    private final String username;
-    private final String password;
     private final Plugin plugin;
     private final String tablePrefix;
-    private final boolean useSSL;
-    private final int connectionTimeout;
 
-    public MySQLDataStore(ConfigLoader configLoader, Plugin plugin) {
+    public MySQLDataStore(ConnectionProvider connectionProvider, ConfigLoader configLoader, Plugin plugin) {
+        this.connectionProvider = connectionProvider;
         this.plugin = plugin;
         this.logger = plugin.getLogger();
-        this.host = configLoader.getMySQLHost();
-        this.port = configLoader.getMySQLPort();
-        this.database = configLoader.getMySQLDatabase();
-        this.username = configLoader.getMySQLUsername();
-        this.password = configLoader.getMySQLPassword();
         this.tablePrefix = configLoader.getMySQLTablePrefix();
-        this.useSSL = configLoader.getMySQLUseSSL();
-        this.connectionTimeout = configLoader.getMySQLConnectionTimeout();
     }
 
     public String getTablePrefix() {
@@ -45,9 +30,6 @@ public class MySQLDataStore implements DataStore {
 
     public void setupDatabase() {
         try {
-            if (dataSource == null || dataSource.isClosed()) {
-                initializeDatabaseConnection();
-            }
             createEconomyTable();
             logger.info("MySQL database setup successful.");
         } catch (SQLException e) {
@@ -58,13 +40,11 @@ public class MySQLDataStore implements DataStore {
     }
 
     public void saveDatabase() {
-        // No action needed for MySQL
+        // Connection lifecycle is managed by ConnectionProvider
     }
 
     public void closeDatabase() {
-        if (dataSource != null && !dataSource.isClosed()) {
-            dataSource.close();
-        }
+        connectionProvider.close();
     }
 
     public double getPlayerBalance(Player player) {
@@ -72,7 +52,7 @@ public class MySQLDataStore implements DataStore {
     }
 
     public double getPlayerBalanceByUUID(UUID playerUUID) {
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT BALANCE FROM " + tablePrefix + "economy WHERE UUID = ?")) {
             stmt.setString(1, playerUUID.toString());
@@ -88,7 +68,7 @@ public class MySQLDataStore implements DataStore {
     }
 
     public boolean changePlayerBalance(UUID playerUUID, double amount) {
-        try (Connection conn = dataSource.getConnection()) {
+        try (Connection conn = connectionProvider.getConnection()) {
             // Atomic: only updates if result would be non-negative
             try (PreparedStatement update = conn.prepareStatement(
                     "UPDATE " + tablePrefix + "economy " +
@@ -129,7 +109,7 @@ public class MySQLDataStore implements DataStore {
     }
 
     public void setPlayerBalance(Player player, double balance) {
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "INSERT INTO " + tablePrefix + "economy (UUID, BALANCE) VALUES (?, ?) " +
                 "ON DUPLICATE KEY UPDATE BALANCE = ?")) {
@@ -143,7 +123,7 @@ public class MySQLDataStore implements DataStore {
     }
 
     public void setPlayerBalance(UUID playerUUID, double balance) {
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "INSERT INTO " + tablePrefix + "economy (UUID, BALANCE) VALUES (?, ?) " +
                         "ON DUPLICATE KEY UPDATE BALANCE = ?")) {
@@ -159,7 +139,7 @@ public class MySQLDataStore implements DataStore {
 
     public Map<String, Double> getAllPlayerBalances() {
         Map<String, Double> balances = new LinkedHashMap<>();
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT UUID, BALANCE FROM " + tablePrefix + "economy")) {
             try (ResultSet rs = stmt.executeQuery()) {
@@ -176,7 +156,7 @@ public class MySQLDataStore implements DataStore {
 
     public Map<String, Double> getTopBalances(int limit) {
         Map<String, Double> topBalances = new LinkedHashMap<>();
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT UUID, BALANCE FROM " + tablePrefix + "economy ORDER BY BALANCE DESC LIMIT ?")) {
             stmt.setInt(1, limit);
@@ -200,11 +180,11 @@ public class MySQLDataStore implements DataStore {
     }
 
     public boolean isConnected() throws SQLException {
-        return dataSource != null && !dataSource.isClosed();
+        return connectionProvider != null && connectionProvider.isValid();
     }
 
     public boolean playerExists(Player player) {
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT 1 FROM " + tablePrefix + "economy WHERE UUID = ?")) {
             stmt.setString(1, player.getUniqueId().toString());
@@ -218,7 +198,7 @@ public class MySQLDataStore implements DataStore {
     }
 
     public boolean playerExistsByUUID(UUID uuid) {
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT 1 FROM " + tablePrefix + "economy WHERE UUID = ?")) {
             stmt.setString(1, uuid.toString());
@@ -232,72 +212,11 @@ public class MySQLDataStore implements DataStore {
     }
 
     /**
-     * Get the HikariCP data source for direct access (used by test generators).
-     * @return the HikariDataSource
+     * Get the connection provider for direct access (used by test generators).
+     * @return the ConnectionProvider
      */
-    public HikariDataSource getDataSource() {
-        return dataSource;
-    }
-
-    // Private helper methods
-    private void initializeDatabaseConnection() throws SQLException {
-        validateConfiguration();
-
-        logger.info(String.format("Configuring HikariCP pool for %s:%d/%s (SSL: %s)",
-            host, port, database, useSSL));
-
-        HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(buildConnectionUrl());
-        config.setUsername(username);
-        config.setPassword(password);
-
-        // Pool sizing
-        config.setMaximumPoolSize(10);
-        config.setMinimumIdle(2);
-
-        // Timeouts
-        config.setConnectionTimeout(connectionTimeout > 0 ? connectionTimeout * 1000L : 30000L);
-        config.setIdleTimeout(600000L);
-        config.setMaxLifetime(1800000L);
-
-        // MySQL optimizations
-        config.addDataSourceProperty("cachePrepStmts", "true");
-        config.addDataSourceProperty("prepStmtCacheSize", "250");
-        config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-        config.addDataSourceProperty("useServerPrepStmts", "true");
-
-        config.setPoolName("TokenEconomy-MySQL");
-
-        dataSource = new HikariDataSource(config);
-        logger.info("HikariCP pool initialized successfully.");
-    }
-
-    private void validateConfiguration() throws SQLException {
-        StringBuilder errors = new StringBuilder();
-
-        if (database == null || database.trim().isEmpty()) {
-            errors.append("Database name is not configured. ");
-        }
-        if (host == null || host.trim().isEmpty()) {
-            errors.append("Host is not configured. ");
-        }
-        if (port <= 0 || port > 65535) {
-            errors.append("Invalid port number (must be between 1 and 65535). ");
-        }
-        if (username == null || username.trim().isEmpty()) {
-            errors.append("Username is not configured. ");
-        }
-
-        if (errors.length() > 0) {
-            throw new SQLException("Invalid MySQL configuration: " + errors.toString() +
-                "Please check your storage.mysql settings in config.yml");
-        }
-    }
-
-    private String buildConnectionUrl() {
-        return String.format("jdbc:mysql://%s:%d/%s?useSSL=%s" +
-            "&serverTimezone=UTC",
-            host, port, database, useSSL);
+    public ConnectionProvider getConnectionProvider() {
+        return connectionProvider;
     }
 
     private void createEconomyTable() throws SQLException {
@@ -306,7 +225,7 @@ public class MySQLDataStore implements DataStore {
                 "BALANCE DOUBLE NOT NULL," +
                 "PRIMARY KEY (UUID)" +
                 ")";
-        try (Connection conn = dataSource.getConnection();
+        try (Connection conn = connectionProvider.getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.executeUpdate(createTableSQL);
         }

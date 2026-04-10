@@ -9,12 +9,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
+import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.tokeneconomy.ConfigLoader;
 
 import java.util.logging.Logger;
 
 public class SQLiteDataStore implements DataStore {
-    private Connection connection;
+    private final ConnectionProvider connectionProvider;
     private final Logger logger;
     private final File dbPath;
     private final ConfigLoader configLoader;
@@ -22,7 +23,8 @@ public class SQLiteDataStore implements DataStore {
     private final String tablePrefix;
     private final String ECONOMY_TABLE;
 
-    public SQLiteDataStore(File dbPath, ConfigLoader configLoader, Plugin plugin) {
+    public SQLiteDataStore(ConnectionProvider connectionProvider, File dbPath, ConfigLoader configLoader, Plugin plugin) {
+        this.connectionProvider = connectionProvider;
         this.dbPath = dbPath;
         this.configLoader = configLoader;
         this.plugin = plugin;
@@ -60,7 +62,6 @@ public class SQLiteDataStore implements DataStore {
             if (configLoader.shouldMigrateOldEconomy()) {
                 moveOldDatabaseFile();
             }
-            initializeDatabaseConnection();
             createEconomyTable();
             logger.info("SQLite database setup successful.");
         } catch (SQLException e) {
@@ -70,23 +71,16 @@ public class SQLiteDataStore implements DataStore {
     }
 
     public void saveDatabase() {
-        try {
-            connection.close();
-        } catch (SQLException e) {
-            logger.severe("Failed to save SQLite database: " + e.getMessage());
-        }
+        // Connection lifecycle is managed by ConnectionProvider
     }
 
     public void closeDatabase() {
-        try {
-            connection.close();
-        } catch (SQLException e) {
-            logger.severe("Failed to close SQLite database: " + e.getMessage());
-        }
+        connectionProvider.close();
     }
 
     public double getPlayerBalance(Player player) {
-        try (PreparedStatement stmt = connection.prepareStatement(
+        try (Connection conn = connectionProvider.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
                 "SELECT BALANCE FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
             stmt.setString(1, player.getUniqueId().toString());
             try (ResultSet rs = stmt.executeQuery()) {
@@ -101,7 +95,8 @@ public class SQLiteDataStore implements DataStore {
     }
 
     public double getPlayerBalanceByUUID(UUID playerUUID) {
-        try (PreparedStatement stmt = connection.prepareStatement(
+        try (Connection conn = connectionProvider.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
                 "SELECT BALANCE FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
             stmt.setString(1, playerUUID.toString());
             try (ResultSet rs = stmt.executeQuery()) {
@@ -116,9 +111,9 @@ public class SQLiteDataStore implements DataStore {
     }
 
     public boolean changePlayerBalance(UUID playerUUID, double amount) {
-        try {
+        try (Connection conn = connectionProvider.getConnection()) {
             // Atomic: only updates if result would be non-negative
-            try (PreparedStatement update = connection.prepareStatement(
+            try (PreparedStatement update = conn.prepareStatement(
                     "UPDATE " + ECONOMY_TABLE + " SET BALANCE = BALANCE + ? WHERE UUID = ? AND BALANCE + ? >= 0")) {
                 update.setDouble(1, amount);
                 update.setString(2, playerUUID.toString());
@@ -128,7 +123,7 @@ public class SQLiteDataStore implements DataStore {
                 }
             }
             // 0 rows: player doesn't exist OR insufficient balance — check which
-            try (PreparedStatement check = connection.prepareStatement(
+            try (PreparedStatement check = conn.prepareStatement(
                     "SELECT 1 FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
                 check.setString(1, playerUUID.toString());
                 try (ResultSet rs = check.executeQuery()) {
@@ -141,7 +136,7 @@ public class SQLiteDataStore implements DataStore {
             if (amount < 0) {
                 return false;
             }
-            try (PreparedStatement insert = connection.prepareStatement(
+            try (PreparedStatement insert = conn.prepareStatement(
                     "INSERT OR IGNORE INTO " + ECONOMY_TABLE + " (UUID, BALANCE) VALUES (?, ?)")) {
                 insert.setString(1, playerUUID.toString());
                 insert.setDouble(2, amount);
@@ -155,7 +150,8 @@ public class SQLiteDataStore implements DataStore {
     }
 
     public void setPlayerBalance(Player player, double balance) {
-        try (PreparedStatement stmt = connection.prepareStatement(
+        try (Connection conn = connectionProvider.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
                 "INSERT INTO " + ECONOMY_TABLE + " (UUID, BALANCE) VALUES (?, ?) " +
                         "ON CONFLICT(UUID) DO UPDATE SET BALANCE = ?")) {
             stmt.setString(1, player.getUniqueId().toString());
@@ -168,7 +164,8 @@ public class SQLiteDataStore implements DataStore {
     }
 
     public void setPlayerBalance(UUID playerUUID, double balance) {
-        try (PreparedStatement stmt = connection.prepareStatement(
+        try (Connection conn = connectionProvider.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
                 "INSERT INTO " + ECONOMY_TABLE + " (UUID, BALANCE) VALUES (?, ?) " +
                         "ON CONFLICT(UUID) DO UPDATE SET BALANCE = ?")) {
             stmt.setString(1, playerUUID.toString());
@@ -182,7 +179,8 @@ public class SQLiteDataStore implements DataStore {
 
     public Map<String, Double> getTopBalances(int limit) {
         Map<String, Double> topBalances = new LinkedHashMap<>();
-        try (PreparedStatement stmt = connection.prepareStatement(
+        try (Connection conn = connectionProvider.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
                 "SELECT UUID, BALANCE FROM " + ECONOMY_TABLE + " ORDER BY BALANCE DESC LIMIT ?")) {
             stmt.setInt(1, limit);
             try (ResultSet rs = stmt.executeQuery()) {
@@ -219,7 +217,8 @@ public class SQLiteDataStore implements DataStore {
 
     public Map<String, Double> getAllPlayerBalances() {
         Map<String, Double> balances = new LinkedHashMap<>();
-        try (Statement stmt = connection.createStatement();
+        try (Connection conn = connectionProvider.getConnection();
+             Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT UUID, BALANCE FROM " + ECONOMY_TABLE)) {
             while (rs.next()) {
                 balances.put(rs.getString("UUID"), rs.getDouble("BALANCE"));
@@ -231,11 +230,12 @@ public class SQLiteDataStore implements DataStore {
     }
 
     public boolean isConnected() throws SQLException {
-        return connection != null && !connection.isClosed();
+        return connectionProvider != null && connectionProvider.isValid();
     }
 
     public boolean playerExists(Player player) {
-        try (PreparedStatement stmt = connection.prepareStatement(
+        try (Connection conn = connectionProvider.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
                 "SELECT 1 FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
             stmt.setString(1, player.getUniqueId().toString());
             try (ResultSet rs = stmt.executeQuery()) {
@@ -248,7 +248,8 @@ public class SQLiteDataStore implements DataStore {
     }
 
     public boolean playerExistsByUUID(UUID uuid) {
-        try (PreparedStatement stmt = connection.prepareStatement(
+        try (Connection conn = connectionProvider.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
                 "SELECT 1 FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
             stmt.setString(1, uuid.toString());
             try (ResultSet rs = stmt.executeQuery()) {
@@ -258,6 +259,10 @@ public class SQLiteDataStore implements DataStore {
             logger.warning("Failed to check player existence by UUID: " + e.getMessage());
             return false;
         }
+    }
+
+    public ConnectionProvider getConnectionProvider() {
+        return connectionProvider;
     }
 
     // Additional private methods specific to SQLiteDataStore
@@ -306,22 +311,9 @@ public class SQLiteDataStore implements DataStore {
         }
     }
 
-    private void initializeDatabaseConnection() throws SQLException {
-        logger.info("Initializing SQLite database connection to " + dbPath.getPath());
-        connection = DriverManager.getConnection("jdbc:sqlite:" + dbPath.getPath());
-        if (connection != null && !connection.isClosed()) {
-            logger.info("SQLite database connection established.");
-        } else {
-            throw new SQLException("Failed to establish SQLite database connection.");
-        }
-    }
-
-    public Connection getConnection() {
-        return connection;
-    }
-
     private void createEconomyTable() throws SQLException {
-        try (Statement stmt = connection.createStatement()) {
+        try (Connection conn = connectionProvider.getConnection();
+             Statement stmt = conn.createStatement()) {
             stmt.executeUpdate("CREATE TABLE IF NOT EXISTS " + ECONOMY_TABLE + " (" +
                     "UUID TEXT PRIMARY KEY," +
                     "BALANCE REAL NOT NULL" +
