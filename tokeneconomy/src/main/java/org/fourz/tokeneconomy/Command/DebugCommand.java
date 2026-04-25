@@ -30,7 +30,7 @@ public class DebugCommand extends BaseCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args) {
-        if (!sender.hasPermission("tokeneconomy.debug")) {
+        if (!sender.hasPermission("tokeneconomy.debug") && !sender.hasPermission("tokeneconomy.admin")) {
             sender.sendMessage(ChatColor.RED + "You don't have permission to use this command.");
             return true;
         }

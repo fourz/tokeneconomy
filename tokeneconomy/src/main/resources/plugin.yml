@@ -28,21 +28,43 @@ commands:
     permission: tokeneconomy.top
 
 permissions:
-  tokeneconomy.*:
-    description: Allows the player to use all tokeneconomy commands
-    default: false
-  tokeneconomy.pay:
-    description: Allows the player to pay another player
-    default: false
+  # ── Player commands ───────────────────────────────────────────────────────
   tokeneconomy.balance:
-    description: Allows the player to check their balance
+    description: Check own balance
     default: true
-  tokeneconomy.set:
-    description: Set an player's balance
-    default: false
-  tokeneconomy.add:  
-    description: Gives the player a certain amount of money from the console
-    default: false
   tokeneconomy.top:
-    description: Allows the player to view the top balances
+    description: View the top balances leaderboard
     default: true
+
+  # ── Staff commands ────────────────────────────────────────────────────────
+  tokeneconomy.balance.others:
+    description: View another player's balance
+    default: op
+  tokeneconomy.balance.*:
+    description: All balance permissions (self + others)
+    default: op
+  tokeneconomy.pay:
+    description: Transfer tokens to another player
+    default: false
+  tokeneconomy.set:
+    description: Set a player's balance
+    default: op
+  tokeneconomy.add:
+    description: Add tokens to a player's balance
+    default: op
+
+  # ── Admin — general ───────────────────────────────────────────────────────
+  tokeneconomy.admin:
+    description: Catch-all admin access
+    default: op
+  tokeneconomy.debug:
+    description: Access debug commands and diagnostics
+    default: op
+  tokeneconomy.admin.seed:
+    description: Seed test data into the database
+    default: op
+
+  # ── Wildcard ──────────────────────────────────────────────────────────────
+  tokeneconomy.*:
+    description: All TokenEconomy permissions
+    default: op

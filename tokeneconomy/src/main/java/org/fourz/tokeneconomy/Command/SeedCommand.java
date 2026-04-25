@@ -38,7 +38,7 @@ public class SeedCommand extends BaseCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args) {
-        if (!sender.hasPermission("tokeneconomy.admin.seed")) {
+        if (!sender.hasPermission("tokeneconomy.admin.seed") && !sender.hasPermission("tokeneconomy.admin")) {
             sender.sendMessage(ChatColor.RED + "You don't have permission to use this command.");
             return true;
         }

@@ -39,7 +39,7 @@ public class BalanceCommand extends BaseCommand {
         }
 
         // Check permissions before allowing to view other player's balance
-        if (!sender.hasPermission("tokeneconomy.balance.others") && !sender.hasPermission("tokeneconomy.balance.*")) {
+        if (!sender.hasPermission("tokeneconomy.balance.others") && !sender.hasPermission("tokeneconomy.balance.*") && !sender.hasPermission("tokeneconomy.admin")) {
             sender.sendMessage(ChatColor.RED + "You don't have permission to check others' balance.");
             return true;
         }
