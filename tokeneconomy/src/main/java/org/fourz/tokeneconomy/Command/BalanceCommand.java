@@ -11,6 +11,7 @@ import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class BalanceCommand extends BaseCommand {
     public BalanceCommand(TokenEconomy plugin) {
@@ -44,16 +45,12 @@ public class BalanceCommand extends BaseCommand {
             return true;
         }
 
-        // Validate target player exists before showing their balance
-        Player targetPlayer = plugin.getServer().getPlayer(args[0]);
-        if (targetPlayer == null) {
-            sender.sendMessage(ChatColor.RED + "Player not found.");
-            return true;
-        }
+        UUID targetUUID = resolvePlayerUUID(sender, args[0]);
+        if (targetUUID == null) return true;
 
-        double balance = plugin.getPlayerBalance(targetPlayer);
+        double balance = plugin.getDataConnector().getPlayerBalanceByUUID(targetUUID);
         String formattedBalance = CurrencyFormatter.format(balance, plugin, true);
-        sender.sendMessage(ChatColor.GREEN + targetPlayer.getName() + "'s balance: " + formattedBalance);
+        sender.sendMessage(ChatColor.GREEN + args[0] + "'s balance: " + formattedBalance);
         return true;
     }
 
