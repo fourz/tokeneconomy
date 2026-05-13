@@ -158,19 +158,23 @@ public class MySQLDataStore implements DataStore {
         Map<String, Double> topBalances = new LinkedHashMap<>();
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
-                "SELECT UUID, BALANCE FROM " + tablePrefix + "economy ORDER BY BALANCE DESC LIMIT ?")) {
+                "SELECT e.UUID, e.BALANCE, p.name AS player_name" +
+                " FROM " + tablePrefix + "economy e" +
+                " LEFT JOIN rvnk_players p ON e.UUID = p.uuid" +
+                " ORDER BY e.BALANCE DESC LIMIT ?")) {
             stmt.setInt(1, limit);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     String uuidStr = rs.getString("UUID");
-                    UUID uuid = UUID.fromString(uuidStr);
                     double balance = rs.getDouble("BALANCE");
-                    String playerName = plugin.getServer().getOfflinePlayer(uuid).getName();
-                    if (playerName != null) {
-                        topBalances.put(playerName, balance);
-                    } else {
-                        topBalances.put(uuidStr, balance);
+                    String playerName = rs.getString("player_name");
+                    if (playerName == null || playerName.isEmpty()) {
+                        // rvnk_players miss — fall back to Bukkit offline cache
+                        try {
+                            playerName = plugin.getServer().getOfflinePlayer(UUID.fromString(uuidStr)).getName();
+                        } catch (IllegalArgumentException ignored) {}
                     }
+                    topBalances.put(playerName != null ? playerName : uuidStr, balance);
                 }
             }
         } catch (SQLException e) {
