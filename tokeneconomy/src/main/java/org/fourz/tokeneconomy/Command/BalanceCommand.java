@@ -9,8 +9,8 @@ import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 import java.util.UUID;
 
 public class BalanceCommand extends BaseCommand {
-    public BalanceCommand(TokenEconomy plugin) {
-        super(plugin);
+    public BalanceCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
+        super(plugin, playerResolver);
     }
 
     @Override

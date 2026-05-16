@@ -8,8 +8,8 @@ import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 import java.util.UUID;
 
 public class SetCommand extends BaseCommand {
-    public SetCommand(TokenEconomy plugin) {
-        super(plugin);
+    public SetCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
+        super(plugin, playerResolver);
     }
 
     @Override

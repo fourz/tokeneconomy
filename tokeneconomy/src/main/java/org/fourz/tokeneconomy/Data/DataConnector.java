@@ -198,13 +198,8 @@ public class DataConnector {
         dataStore.closeDatabase();
     }
 
-    /**
-     * Retrieves a player's current balance from the database.
-     * @param player The player whose balance to retrieve
-     * @return The player's balance, or 0.0 if not found or error occurs
-     */
     public double getPlayerBalance(Player player) {
-        return dataStore.getPlayerBalance(player);
+        return dataStore.getPlayerBalanceByUUID(player.getUniqueId());
     }
 
     public double getPlayerBalanceByUUID(UUID playerUUID) {
@@ -216,25 +211,13 @@ public class DataConnector {
     }
 
     public boolean playerExists(Player player) {
-        return dataStore.playerExists(player);
+        return dataStore.playerExistsByUUID(player.getUniqueId());
     }
 
-    /**
-     * Updates or inserts a player's balance using UPSERT operation.
-     * Uses transaction to ensure data integrity.
-     * @param player The player whose balance to set
-     * @param balance The new balance value
-     */
     public void setPlayerBalance(Player player, double balance) {
-        dataStore.setPlayerBalance(player, balance);
+        dataStore.setPlayerBalance(player.getUniqueId(), balance);
     }
 
-    /**
-     * Updates or inserts a player's balance by UUID.
-     * Works for both online and offline players.
-     * @param uuid The player's UUID
-     * @param balance The new balance value
-     */
     public void setPlayerBalance(UUID uuid, double balance) {
         dataStore.setPlayerBalance(uuid, balance);
     }

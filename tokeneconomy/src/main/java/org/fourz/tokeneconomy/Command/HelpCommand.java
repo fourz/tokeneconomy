@@ -5,8 +5,8 @@ import org.bukkit.command.CommandSender;
 import org.fourz.tokeneconomy.TokenEconomy;
 
 public class HelpCommand extends BaseCommand {
-    public HelpCommand(TokenEconomy plugin) {
-        super(plugin);
+    public HelpCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
+        super(plugin, playerResolver);
     }
 
     @Override

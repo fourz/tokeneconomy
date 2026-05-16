@@ -13,9 +13,8 @@ import java.util.List;
 import java.util.Map;
 
 public class TopCommand extends BaseCommand implements CommandExecutor, TabCompleter {
-    // Constructor for initializing the command with plugin instance
-    public TopCommand(TokenEconomy plugin) {
-        super(plugin);
+    public TopCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
+        super(plugin, playerResolver);
     }
 
     @Override

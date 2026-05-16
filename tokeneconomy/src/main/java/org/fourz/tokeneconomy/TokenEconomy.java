@@ -2,14 +2,17 @@ package org.fourz.tokeneconomy;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.fourz.tokeneconomy.Command.BalanceCommand;
+import org.fourz.tokeneconomy.Command.BukkitPlayerResolver;
 import org.fourz.tokeneconomy.Command.EconomyCommand;
 import org.fourz.tokeneconomy.Command.PayCommand;
+import org.fourz.tokeneconomy.Command.PlayerResolver;
+import org.fourz.tokeneconomy.Command.RVNKCorePlayerResolver;
 import org.fourz.tokeneconomy.Data.DataConnector;
-import org.fourz.tokeneconomy.Command.BalanceCommand;
 
 import net.milkbowl.vault.economy.Economy;
 import org.fourz.tokeneconomy.service.EconomyServiceImpl;
@@ -18,11 +21,9 @@ import java.util.Map;
 import java.util.logging.Level;
 
 public class TokenEconomy extends JavaPlugin {
-    // These components are separated to maintain single responsibility principle and improve maintainability
     private ConfigLoader configLoader;
     private DataConnector dataConnector;
-    private boolean rvnkCoreAvailable = false;
-    private Object rvnkCoreInstance = null;
+    private RVNKCoreIntegrationManager rvnkCoreIntegration;
 
     @Override
     public void onEnable() {
@@ -65,7 +66,8 @@ public class TokenEconomy extends JavaPlugin {
             TokenEconomyAPI.init(this);
 
             // Register with RVNKCore ServiceRegistry if available
-            registerWithRVNKCore();
+            rvnkCoreIntegration = new RVNKCoreIntegrationManager(this, configLoader, new EconomyServiceImpl(this));
+            rvnkCoreIntegration.register();
 
             getLogger().info("TokenEconomy successfully enabled!");
         } catch (Exception e) {
@@ -81,8 +83,7 @@ public class TokenEconomy extends JavaPlugin {
     @Override
     public void onDisable() {
         try {
-            // Unregister from RVNKCore first
-            unregisterFromRVNKCore();
+            if (rvnkCoreIntegration != null) rvnkCoreIntegration.unregister();
 
             getLogger().info("Disabling TokenEconomy...");
             if (dataConnector != null) {
@@ -116,17 +117,26 @@ public class TokenEconomy extends JavaPlugin {
     }
 
     private void registerCommands() {
-        // Null checks prevent NPEs in case commands aren't properly defined in plugin.yml
+        PlayerResolver resolver = createPlayerResolver();
         if (getCommand("economy") != null) {
             getCommand("economy").setExecutor(new EconomyCommand(this));
         }
         if (getCommand("balance") != null) {
-            getCommand("balance").setExecutor(new BalanceCommand(this));
+            getCommand("balance").setExecutor(new BalanceCommand(this, resolver));
         }
         if (getCommand("pay") != null) {
-            getCommand("pay").setExecutor(new PayCommand(this));
+            getCommand("pay").setExecutor(new PayCommand(this, resolver));
         }
         getLogger().info("Commands registered successfully.");
+    }
+
+    private PlayerResolver createPlayerResolver() {
+        try {
+            Class.forName("org.fourz.rvnkcore.RVNKCore");
+            return new RVNKCorePlayerResolver(getServer(), getLogger());
+        } catch (ClassNotFoundException e) {
+            return new BukkitPlayerResolver(getServer());
+        }
     }
 
     private void registerGriefProtectionHook() {
@@ -173,76 +183,4 @@ public class TokenEconomy extends JavaPlugin {
         return dataConnector.getTopBalances(15); // Default limit of 15
     }
 
-    /**
-     * Registers IEconomyService with RVNKCore ServiceRegistry if enabled in config and available.
-     * Uses reflection to keep RVNKCore as a soft runtime dependency — TokenEconomy functions
-     * as a standalone Vault economy plugin when integration is disabled or RVNKCore is absent.
-     */
-    private void registerWithRVNKCore() {
-        if (!configLoader.isRvnkcoreIntegrationEnabled()) {
-            getLogger().info("RVNKCore integration disabled in config - running in standalone mode");
-            return;
-        }
-
-        Plugin rvnkCorePlugin = getServer().getPluginManager().getPlugin("RVNKCore");
-        if (rvnkCorePlugin == null || !rvnkCorePlugin.isEnabled()) {
-            getLogger().info("RVNKCore not found - running in standalone mode");
-            return;
-        }
-
-        try {
-            Class<?> rvnkCoreClass = Class.forName("org.fourz.rvnkcore.RVNKCore");
-            Object coreInstance = rvnkCoreClass.getMethod("getInstance").invoke(null);
-            if (coreInstance == null) {
-                getLogger().warning("RVNKCore instance is null - service not registered");
-                return;
-            }
-
-            Object serviceRegistry = rvnkCoreClass.getMethod("getServiceRegistry").invoke(coreInstance);
-            if (serviceRegistry == null) {
-                getLogger().warning("RVNKCore ServiceRegistry is null - service not registered");
-                return;
-            }
-
-            Class<?> serviceInterface = Class.forName("org.fourz.rvnkcore.api.service.IEconomyService");
-            java.lang.reflect.Method registerMethod = serviceRegistry.getClass()
-                    .getMethod("registerService", Class.class, Object.class);
-            registerMethod.invoke(serviceRegistry, serviceInterface, new EconomyServiceImpl(this));
-
-            rvnkCoreAvailable = true;
-            rvnkCoreInstance = coreInstance;
-            getLogger().info("Registered IEconomyService with RVNKCore ServiceRegistry");
-
-        } catch (ClassNotFoundException e) {
-            getLogger().info("RVNKCore classes not found - running in standalone mode");
-        } catch (Exception e) {
-            getLogger().warning("Failed to register with RVNKCore: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Unregisters IEconomyService from RVNKCore ServiceRegistry.
-     */
-    private void unregisterFromRVNKCore() {
-        if (!rvnkCoreAvailable || rvnkCoreInstance == null) {
-            return;
-        }
-
-        try {
-            Object serviceRegistry = rvnkCoreInstance.getClass()
-                    .getMethod("getServiceRegistry").invoke(rvnkCoreInstance);
-            if (serviceRegistry != null) {
-                Class<?> serviceInterface = Class.forName("org.fourz.rvnkcore.api.service.IEconomyService");
-                java.lang.reflect.Method unregisterMethod = serviceRegistry.getClass()
-                        .getMethod("unregisterService", Class.class);
-                unregisterMethod.invoke(serviceRegistry, serviceInterface);
-                getLogger().info("Unregistered IEconomyService from RVNKCore");
-            }
-        } catch (Exception e) {
-            getLogger().warning("Failed to unregister from RVNKCore: " + e.getMessage());
-        }
-
-        rvnkCoreAvailable = false;
-        rvnkCoreInstance = null;
-    }
 }

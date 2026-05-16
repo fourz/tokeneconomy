@@ -23,9 +23,9 @@ public class DebugCommand extends BaseCommand {
 
     private final SeedCommand seedCommand;
 
-    public DebugCommand(TokenEconomy plugin) {
-        super(plugin);
-        this.seedCommand = new SeedCommand(plugin);
+    public DebugCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
+        super(plugin, playerResolver);
+        this.seedCommand = new SeedCommand(plugin, playerResolver);
     }
 
     @Override

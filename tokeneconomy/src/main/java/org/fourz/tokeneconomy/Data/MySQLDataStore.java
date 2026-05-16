@@ -4,7 +4,6 @@ import java.sql.*;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
-import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.tokeneconomy.ConfigLoader;
@@ -40,10 +39,6 @@ public class MySQLDataStore extends AbstractDataStore {
 
     public void closeDatabase() {
         connectionProvider.close();
-    }
-
-    public double getPlayerBalance(Player player) {
-        return getPlayerBalanceByUUID(player.getUniqueId());
     }
 
     public double getPlayerBalanceByUUID(UUID playerUUID) {
@@ -100,20 +95,6 @@ public class MySQLDataStore extends AbstractDataStore {
         } catch (SQLException e) {
             logger.severe("Failed to update player balance: " + e.getMessage());
             return false;
-        }
-    }
-
-    public void setPlayerBalance(Player player, double balance) {
-        try (Connection conn = connectionProvider.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "INSERT INTO " + table("economy") + " (UUID, BALANCE) VALUES (?, ?) " +
-                "ON DUPLICATE KEY UPDATE BALANCE = ?")) {
-            stmt.setString(1, player.getUniqueId().toString());
-            stmt.setDouble(2, balance);
-            stmt.setDouble(3, balance);
-            stmt.executeUpdate();
-        } catch (SQLException e) {
-            logger.severe("Failed to set player balance: " + e.getMessage());
         }
     }
 
@@ -180,20 +161,6 @@ public class MySQLDataStore extends AbstractDataStore {
 
     public boolean isConnected() throws SQLException {
         return connectionProvider != null && connectionProvider.isValid();
-    }
-
-    public boolean playerExists(Player player) {
-        try (Connection conn = connectionProvider.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "SELECT 1 FROM " + table("economy") + " WHERE UUID = ?")) {
-            stmt.setString(1, player.getUniqueId().toString());
-            try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            logger.warning("Failed to check player existence: " + e.getMessage());
-            return false;
-        }
     }
 
     public boolean playerExistsByUUID(UUID uuid) {

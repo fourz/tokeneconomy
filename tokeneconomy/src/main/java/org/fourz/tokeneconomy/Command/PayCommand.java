@@ -6,8 +6,8 @@ import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 
 public class PayCommand extends BaseCommand {
-    public PayCommand(TokenEconomy plugin) {
-        super(plugin);
+    public PayCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
+        super(plugin, playerResolver);
     }
 
     @Override

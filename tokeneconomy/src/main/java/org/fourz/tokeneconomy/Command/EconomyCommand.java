@@ -31,14 +31,23 @@ public class EconomyCommand implements CommandExecutor, TabCompleter {
         this.plugin = plugin;
         this.commands = new HashMap<>();
 
-        // Initialize all available economy subcommands
-        commands.put("balance", new BalanceCommand(plugin));
-        commands.put("pay", new PayCommand(plugin));
-        commands.put("set", new SetCommand(plugin));
-        commands.put("add", new AddCommand(plugin));
-        commands.put("top", new TopCommand(plugin));
-        commands.put("debug", new DebugCommand(plugin));
-        commands.put("help", new HelpCommand(plugin));  // bug-02 fix: Register help command
+        PlayerResolver resolver = createResolver(plugin);
+        commands.put("balance", new BalanceCommand(plugin, resolver));
+        commands.put("pay", new PayCommand(plugin, resolver));
+        commands.put("set", new SetCommand(plugin, resolver));
+        commands.put("add", new AddCommand(plugin, resolver));
+        commands.put("top", new TopCommand(plugin, resolver));
+        commands.put("debug", new DebugCommand(plugin, resolver));
+        commands.put("help", new HelpCommand(plugin, resolver));
+    }
+
+    private static PlayerResolver createResolver(TokenEconomy plugin) {
+        try {
+            Class.forName("org.fourz.rvnkcore.RVNKCore");
+            return new RVNKCorePlayerResolver(plugin.getServer(), plugin.getLogger());
+        } catch (ClassNotFoundException e) {
+            return new BukkitPlayerResolver(plugin.getServer());
+        }
     }
 
     @Override

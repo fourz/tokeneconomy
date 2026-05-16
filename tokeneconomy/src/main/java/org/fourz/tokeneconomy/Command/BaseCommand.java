@@ -8,22 +8,21 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
-import org.fourz.rvnkcore.RVNKCore;
-import org.fourz.rvnkcore.api.model.PlayerDTO;
-import org.fourz.rvnkcore.api.service.PlayerService;
 import org.fourz.tokeneconomy.TokenEconomy;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+
 
 public abstract class BaseCommand implements CommandExecutor, TabCompleter {
     protected final TokenEconomy plugin;
+    private final PlayerResolver playerResolver;
 
-    public BaseCommand(TokenEconomy plugin) {
+    public BaseCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
         this.plugin = plugin;
+        this.playerResolver = playerResolver;
     }
 
     @Override
@@ -62,33 +61,13 @@ public abstract class BaseCommand implements CommandExecutor, TabCompleter {
         return target;
     }
 
-    /**
-     * Resolves a player UUID for both online and offline players.
-     * Online players are resolved directly; offline players are looked up
-     * via RVNKCore's PlayerService (rvnk_players table).
-     */
     protected UUID resolvePlayerUUID(CommandSender sender, String playerName) {
-        Player online = plugin.getServer().getPlayer(playerName);
-        if (online != null) return online.getUniqueId();
-
-        try {
-            RVNKCore core = RVNKCore.getInstance();
-            if (core != null) {
-                PlayerService playerService = core.getPlayerService();
-                if (playerService != null) {
-                    Optional<PlayerDTO> opt = playerService.getPlayerByName(playerName)
-                            .get(5, TimeUnit.SECONDS);
-                    if (opt.isPresent()) {
-                        return opt.get().getId();
-                    }
-                }
-            }
-        } catch (Exception e) {
-            plugin.getLogger().fine("Offline player lookup failed for " + playerName + ": " + e.getMessage());
+        Optional<UUID> result = playerResolver.resolve(playerName);
+        if (result.isEmpty()) {
+            sendError(sender, "Player not found.");
+            return null;
         }
-
-        sendError(sender, "Player not found.");
-        return null;
+        return result.get();
     }
 
     // Common amount parsing

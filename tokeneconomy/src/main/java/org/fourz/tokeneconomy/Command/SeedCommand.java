@@ -32,8 +32,8 @@ public class SeedCommand extends BaseCommand {
     private EconomyTestDataGenerator generator;
     private boolean seeding = false;
 
-    public SeedCommand(TokenEconomy plugin) {
-        super(plugin);
+    public SeedCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
+        super(plugin, playerResolver);
     }
 
     @Override
