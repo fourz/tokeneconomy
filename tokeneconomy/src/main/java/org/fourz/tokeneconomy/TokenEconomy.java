@@ -40,8 +40,6 @@ public class TokenEconomy extends JavaPlugin {
                 getLogger().warning("Invalid log level in config: " + logLevelStr);
             }
 
-            getLogger().info("Initializing TokenEconomy...");
-            
             // Initialize Vault after config is loaded
             if (!setupVault()) {
                 getLogger().severe("Vault not found! TokenEconomy cannot function as an economy plugin.");

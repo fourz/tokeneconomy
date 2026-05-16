@@ -117,9 +117,11 @@ public class SeedCommand extends BaseCommand {
             }
         }).exceptionally(ex -> {
             seeding = false;
-            Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-            plugin.getLogger().severe("Seed operation failed: " + cause.getMessage());
-            sender.sendMessage(ChatColor.RED + "Seed failed: " + cause.getMessage());
+            Throwable cause = ex;
+            while (cause.getCause() != null) cause = cause.getCause();
+            plugin.getLogger().severe("Seed operation failed [" + cause.getClass().getName() + "]: " + cause.getMessage());
+            for (StackTraceElement el : cause.getStackTrace()) plugin.getLogger().severe("  at " + el);
+            sender.sendMessage(ChatColor.RED + "Seed failed: " + cause.getClass().getSimpleName() + ": " + cause.getMessage());
             return null;
         });
 

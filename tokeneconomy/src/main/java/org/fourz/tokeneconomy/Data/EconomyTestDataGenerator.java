@@ -80,8 +80,8 @@ public class EconomyTestDataGenerator {
                 } finally {
                     conn.setAutoCommit(true);
                 }
-            } catch (SQLException e) {
-                logSevere("Failed to get connection for seed: " + e.getMessage());
+            } catch (Exception e) {
+                logSevere("Seed connection failure [" + e.getClass().getName() + "]: " + e.getMessage());
                 return 0;
             }
 
