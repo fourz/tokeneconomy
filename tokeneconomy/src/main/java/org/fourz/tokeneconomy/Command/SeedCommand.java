@@ -5,7 +5,7 @@ import org.bukkit.command.CommandSender;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Data.DataStore;
 import org.fourz.tokeneconomy.Data.EconomyTestDataGenerator;
-import org.fourz.rvnkcore.testing.TestDataGenerator.DataCategory;
+import org.fourz.tokeneconomy.Data.EconomyTestDataGenerator.DataCategory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,7 +21,6 @@ import java.util.UUID;
  *   <li>/eco debug seed cleanup - Remove all test data</li>
  *   <li>/eco debug seed cleanup [player-uuid] - Remove data for specific player</li>
  *   <li>/eco debug seed status - Show seeding status</li>
- *   <li>/eco debug seed legacy <category> - Seed legacy economy table</li>
  * </ul>
  * </p>
  */
@@ -68,7 +67,7 @@ public class SeedCommand extends BaseCommand {
         }
 
         if (generator == null) {
-            generator = new EconomyTestDataGenerator(dataStore);
+            generator = new EconomyTestDataGenerator(dataStore, plugin.getLogger());
         }
 
         switch (action) {
@@ -118,8 +117,9 @@ public class SeedCommand extends BaseCommand {
             }
         }).exceptionally(ex -> {
             seeding = false;
-            sender.sendMessage(ChatColor.RED + "Seed failed: " + ex.getMessage());
-            plugin.getLogger().severe("Seed operation failed: " + ex.getMessage());
+            Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+            plugin.getLogger().severe("Seed operation failed: " + cause.getMessage());
+            sender.sendMessage(ChatColor.RED + "Seed failed: " + cause.getMessage());
             return null;
         });
 
@@ -199,13 +199,6 @@ public class SeedCommand extends BaseCommand {
             for (String action : ACTIONS) {
                 if (action.startsWith(partial)) {
                     completions.add(action);
-                }
-            }
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("legacy")) {
-            String partial = args[1].toLowerCase();
-            for (String cat : Arrays.asList("minimal", "standard", "stress")) {
-                if (cat.startsWith(partial)) {
-                    completions.add(cat);
                 }
             }
         }

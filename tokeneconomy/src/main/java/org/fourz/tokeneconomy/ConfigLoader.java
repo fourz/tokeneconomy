@@ -24,7 +24,7 @@ public class ConfigLoader {
     private boolean migrateFromMySQL;
     private boolean migrateFromSQLite;
     private String migrationStatus; // "none", "in_progress", "completed", "failed"
-    private boolean rvnkcoreIntegrationEnabled;
+    private String databaseMode; // "shared" or "standalone"
 
     public ConfigLoader(TokenEconomy plugin) {
         this.plugin = plugin;
@@ -45,6 +45,7 @@ public class ConfigLoader {
         currencySymbol = config.getString("economy.currencySymbol", "[o]");
         
         storageType = config.getString("storage.type", "sqlite").toLowerCase();
+        databaseMode = config.getString("database.mode", "standalone").toLowerCase();
         migrateFromMySQL = config.getBoolean("storage.migrate_from_mysql", false);
         migrateFromSQLite = config.getBoolean("storage.migrate_from_sqlite", false);
         migrationStatus = config.getString("storage.migration_status", "none");
@@ -53,8 +54,6 @@ public class ConfigLoader {
             config.set("storage.migration_status", "none");
             plugin.saveConfig();
         }
-
-        rvnkcoreIntegrationEnabled = config.getBoolean("integration.rvnkcore.enabled", true);
 
         if (storageType.equals("mysql")) {
             mysqlHost = config.getString("storage.mysql.host");
@@ -137,6 +136,10 @@ public class ConfigLoader {
         return mysqlRetryDelay;
     }
 
+    public String getDatabaseMode() {
+        return databaseMode;
+    }
+
     public boolean shouldMigrateFromMySQL() {
         return migrateFromMySQL;
     }
@@ -155,7 +158,4 @@ public class ConfigLoader {
         plugin.saveConfig();
     }
 
-    public boolean isRvnkcoreIntegrationEnabled() {
-        return rvnkcoreIntegrationEnabled;
-    }
 }

@@ -5,19 +5,19 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.plugin.Plugin;
-import org.fourz.rvnkcore.database.connection.ConnectionProvider;
 import org.fourz.tokeneconomy.ConfigLoader;
+import org.fourz.tokeneconomy.Data.connection.PoolDelegate;
 
 import java.util.logging.Logger;
 
 public class MySQLDataStore extends AbstractDataStore {
-    private final ConnectionProvider connectionProvider;
+    private final PoolDelegate pool;
     private final Logger logger;
     private final Plugin plugin;
 
-    public MySQLDataStore(ConnectionProvider connectionProvider, ConfigLoader configLoader, Plugin plugin) {
+    public MySQLDataStore(PoolDelegate pool, ConfigLoader configLoader, Plugin plugin) {
         super(configLoader.getMySQLTablePrefix());
-        this.connectionProvider = connectionProvider;
+        this.pool = pool;
         this.plugin = plugin;
         this.logger = plugin.getLogger();
     }
@@ -33,20 +33,17 @@ public class MySQLDataStore extends AbstractDataStore {
         }
     }
 
-    public void saveDatabase() {
-        // Connection lifecycle is managed by ConnectionProvider
-    }
+    public void saveDatabase() {}
 
     public void closeDatabase() {
-        connectionProvider.close();
+        pool.shutdown();
     }
 
     @Override
     protected Logger getLogger() { return logger; }
 
     public boolean changePlayerBalance(UUID playerUUID, double amount) {
-        try (Connection conn = connectionProvider.getConnection()) {
-            // Atomic: only updates if result would be non-negative
+        try (Connection conn = pool.getConnection()) {
             try (PreparedStatement update = conn.prepareStatement(
                     "UPDATE " + table("economy") + " " +
                     "SET BALANCE = BALANCE + ? " +
@@ -54,24 +51,16 @@ public class MySQLDataStore extends AbstractDataStore {
                 update.setDouble(1, amount);
                 update.setString(2, playerUUID.toString());
                 update.setDouble(3, amount);
-                if (update.executeUpdate() > 0) {
-                    return true;
-                }
+                if (update.executeUpdate() > 0) return true;
             }
-            // 0 rows: player doesn't exist OR insufficient balance — check which
             try (PreparedStatement check = conn.prepareStatement(
                     "SELECT 1 FROM " + table("economy") + " WHERE UUID = ?")) {
                 check.setString(1, playerUUID.toString());
                 try (ResultSet rs = check.executeQuery()) {
-                    if (rs.next()) {
-                        return false; // exists but insufficient balance
-                    }
+                    if (rs.next()) return false;
                 }
             }
-            // Player not found: only allow non-negative initial balance
-            if (amount < 0) {
-                return false;
-            }
+            if (amount < 0) return false;
             try (PreparedStatement insert = conn.prepareStatement(
                     "INSERT IGNORE INTO " + table("economy") + " (UUID, BALANCE) VALUES (?, ?)")) {
                 insert.setString(1, playerUUID.toString());
@@ -86,7 +75,7 @@ public class MySQLDataStore extends AbstractDataStore {
     }
 
     public void setPlayerBalance(UUID playerUUID, double balance) {
-        try (Connection conn = connectionProvider.getConnection();
+        try (Connection conn = pool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "INSERT INTO " + table("economy") + " (UUID, BALANCE) VALUES (?, ?) " +
                         "ON DUPLICATE KEY UPDATE BALANCE = ?")) {
@@ -102,7 +91,7 @@ public class MySQLDataStore extends AbstractDataStore {
 
     public Map<String, Double> getAllPlayerBalances() {
         Map<String, Double> balances = new LinkedHashMap<>();
-        try (Connection conn = connectionProvider.getConnection();
+        try (Connection conn = pool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT UUID, BALANCE FROM " + table("economy"))) {
             try (ResultSet rs = stmt.executeQuery()) {
@@ -119,7 +108,7 @@ public class MySQLDataStore extends AbstractDataStore {
 
     public Map<String, Double> getTopBalances(int limit) {
         Map<String, Double> topBalances = new LinkedHashMap<>();
-        try (Connection conn = connectionProvider.getConnection();
+        try (Connection conn = pool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT e.UUID, e.BALANCE, p.name AS player_name" +
                 " FROM " + table("economy") + " e" +
@@ -132,7 +121,6 @@ public class MySQLDataStore extends AbstractDataStore {
                     double balance = rs.getDouble("BALANCE");
                     String playerName = rs.getString("player_name");
                     if (playerName == null || playerName.isEmpty()) {
-                        // rvnk_players miss — fall back to Bukkit offline cache
                         try {
                             playerName = plugin.getServer().getOfflinePlayer(UUID.fromString(uuidStr)).getName();
                         } catch (IllegalArgumentException ignored) {}
@@ -147,11 +135,11 @@ public class MySQLDataStore extends AbstractDataStore {
     }
 
     public boolean isConnected() throws SQLException {
-        return connectionProvider != null && connectionProvider.isValid();
+        return pool != null;
     }
 
     public boolean playerExistsByUUID(UUID uuid) {
-        try (Connection conn = connectionProvider.getConnection();
+        try (Connection conn = pool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT 1 FROM " + table("economy") + " WHERE UUID = ?")) {
             stmt.setString(1, uuid.toString());
@@ -164,24 +152,19 @@ public class MySQLDataStore extends AbstractDataStore {
         }
     }
 
-    /**
-     * Get the connection provider for direct access (used by test generators).
-     * @return the ConnectionProvider
-     */
     @Override
-    public java.sql.Connection getConnection() throws java.sql.SQLException {
-        return connectionProvider.getConnection();
+    public Connection getConnection() throws SQLException {
+        return pool.getConnection();
     }
 
     private void createEconomyTable() throws SQLException {
-        String createTableSQL = "CREATE TABLE IF NOT EXISTS " + table("economy") + " (" +
-                "UUID VARCHAR(36) NOT NULL," +
-                "BALANCE DOUBLE NOT NULL," +
-                "PRIMARY KEY (UUID)" +
-                ")";
-        try (Connection conn = connectionProvider.getConnection();
+        try (Connection conn = pool.getConnection();
              Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate(createTableSQL);
+            stmt.executeUpdate("CREATE TABLE IF NOT EXISTS " + table("economy") + " (" +
+                    "UUID VARCHAR(36) NOT NULL," +
+                    "BALANCE DOUBLE NOT NULL," +
+                    "PRIMARY KEY (UUID)" +
+                    ")");
         }
     }
 }

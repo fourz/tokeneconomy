@@ -13,7 +13,6 @@ import org.fourz.tokeneconomy.Command.PlayerResolver;
 import org.fourz.tokeneconomy.Data.DataConnector;
 
 import net.milkbowl.vault.economy.Economy;
-import org.fourz.tokeneconomy.service.EconomyServiceImpl;
 
 import java.util.Map;
 import java.util.logging.Level;
@@ -21,7 +20,6 @@ import java.util.logging.Level;
 public class TokenEconomy extends JavaPlugin {
     private ConfigLoader configLoader;
     private DataConnector dataConnector;
-    private RVNKCoreIntegrationManager rvnkCoreIntegration;
 
     @Override
     public void onEnable() {
@@ -42,7 +40,6 @@ public class TokenEconomy extends JavaPlugin {
                 getLogger().warning("Invalid log level in config: " + logLevelStr);
             }
 
-            getLogger().info("Enabling TokenEconomy...");
             getLogger().info("Initializing TokenEconomy...");
             
             // Initialize Vault after config is loaded
@@ -63,10 +60,6 @@ public class TokenEconomy extends JavaPlugin {
 
             TokenEconomyAPI.init(this);
 
-            // Register with RVNKCore ServiceRegistry if available
-            rvnkCoreIntegration = new RVNKCoreIntegrationManager(this, configLoader, new EconomyServiceImpl(this));
-            rvnkCoreIntegration.register();
-
             getLogger().info("TokenEconomy successfully enabled!");
         } catch (Exception e) {
             getLogger().severe("An error occurred while enabling TokenEconomy: " + e.getMessage());
@@ -81,8 +74,6 @@ public class TokenEconomy extends JavaPlugin {
     @Override
     public void onDisable() {
         try {
-            if (rvnkCoreIntegration != null) rvnkCoreIntegration.unregister();
-
             getLogger().info("Disabling TokenEconomy...");
             if (dataConnector != null) {
                 // Save and close database
