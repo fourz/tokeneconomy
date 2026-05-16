@@ -52,7 +52,7 @@ public class TokenEconomyVaultAdapter implements Economy {
 
     @Override
     public String format(double amount) {
-        return CurrencyFormatter.format(amount, plugin);
+        return CurrencyFormatter.format(amount, configLoader.getCurrencyNameSingular(), configLoader.getCurrencyNamePlural());
     }
 
     // ─── Account existence ───────────────────────────────────────────────────

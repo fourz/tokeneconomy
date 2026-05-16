@@ -29,7 +29,7 @@ public class AddCommand extends BaseCommand {
         Double amount = parseAmount(sender, args[1]);
         if (amount == null) return true;
 
-        String formattedAmount = CurrencyFormatter.format(amount, plugin);
+        String formattedAmount = CurrencyFormatter.format(amount, plugin.currencyNameSingular(), plugin.currencyNamePlural());
         plugin.getDataConnector().changePlayerBalance(targetUUID, amount);
         sendSuccess(sender, "You added " + formattedAmount + " to " + args[0] + ".");
         Player online = plugin.getServer().getPlayer(targetUUID);

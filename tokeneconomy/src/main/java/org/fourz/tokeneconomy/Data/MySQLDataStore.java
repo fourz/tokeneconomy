@@ -11,21 +11,16 @@ import org.fourz.tokeneconomy.ConfigLoader;
 
 import java.util.logging.Logger;
 
-public class MySQLDataStore implements DataStore {
+public class MySQLDataStore extends AbstractDataStore {
     private final ConnectionProvider connectionProvider;
     private final Logger logger;
     private final Plugin plugin;
-    private final String tablePrefix;
 
     public MySQLDataStore(ConnectionProvider connectionProvider, ConfigLoader configLoader, Plugin plugin) {
+        super(configLoader.getMySQLTablePrefix());
         this.connectionProvider = connectionProvider;
         this.plugin = plugin;
         this.logger = plugin.getLogger();
-        this.tablePrefix = configLoader.getMySQLTablePrefix();
-    }
-
-    public String getTablePrefix() {
-        return tablePrefix;
     }
 
     public void setupDatabase() {
@@ -54,7 +49,7 @@ public class MySQLDataStore implements DataStore {
     public double getPlayerBalanceByUUID(UUID playerUUID) {
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
-                "SELECT BALANCE FROM " + tablePrefix + "economy WHERE UUID = ?")) {
+                "SELECT BALANCE FROM " + table("economy") + " WHERE UUID = ?")) {
             stmt.setString(1, playerUUID.toString());
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -71,7 +66,7 @@ public class MySQLDataStore implements DataStore {
         try (Connection conn = connectionProvider.getConnection()) {
             // Atomic: only updates if result would be non-negative
             try (PreparedStatement update = conn.prepareStatement(
-                    "UPDATE " + tablePrefix + "economy " +
+                    "UPDATE " + table("economy") + " " +
                     "SET BALANCE = BALANCE + ? " +
                     "WHERE UUID = ? AND BALANCE + ? >= 0")) {
                 update.setDouble(1, amount);
@@ -83,7 +78,7 @@ public class MySQLDataStore implements DataStore {
             }
             // 0 rows: player doesn't exist OR insufficient balance — check which
             try (PreparedStatement check = conn.prepareStatement(
-                    "SELECT 1 FROM " + tablePrefix + "economy WHERE UUID = ?")) {
+                    "SELECT 1 FROM " + table("economy") + " WHERE UUID = ?")) {
                 check.setString(1, playerUUID.toString());
                 try (ResultSet rs = check.executeQuery()) {
                     if (rs.next()) {
@@ -96,7 +91,7 @@ public class MySQLDataStore implements DataStore {
                 return false;
             }
             try (PreparedStatement insert = conn.prepareStatement(
-                    "INSERT IGNORE INTO " + tablePrefix + "economy (UUID, BALANCE) VALUES (?, ?)")) {
+                    "INSERT IGNORE INTO " + table("economy") + " (UUID, BALANCE) VALUES (?, ?)")) {
                 insert.setString(1, playerUUID.toString());
                 insert.setDouble(2, amount);
                 insert.executeUpdate();
@@ -111,7 +106,7 @@ public class MySQLDataStore implements DataStore {
     public void setPlayerBalance(Player player, double balance) {
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
-                "INSERT INTO " + tablePrefix + "economy (UUID, BALANCE) VALUES (?, ?) " +
+                "INSERT INTO " + table("economy") + " (UUID, BALANCE) VALUES (?, ?) " +
                 "ON DUPLICATE KEY UPDATE BALANCE = ?")) {
             stmt.setString(1, player.getUniqueId().toString());
             stmt.setDouble(2, balance);
@@ -125,7 +120,7 @@ public class MySQLDataStore implements DataStore {
     public void setPlayerBalance(UUID playerUUID, double balance) {
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
-                "INSERT INTO " + tablePrefix + "economy (UUID, BALANCE) VALUES (?, ?) " +
+                "INSERT INTO " + table("economy") + " (UUID, BALANCE) VALUES (?, ?) " +
                         "ON DUPLICATE KEY UPDATE BALANCE = ?")) {
             stmt.setString(1, playerUUID.toString());
             stmt.setDouble(2, balance);
@@ -141,7 +136,7 @@ public class MySQLDataStore implements DataStore {
         Map<String, Double> balances = new LinkedHashMap<>();
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
-                "SELECT UUID, BALANCE FROM " + tablePrefix + "economy")) {
+                "SELECT UUID, BALANCE FROM " + table("economy"))) {
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     balances.put(rs.getString("UUID"), rs.getDouble("BALANCE"));
@@ -159,7 +154,7 @@ public class MySQLDataStore implements DataStore {
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT e.UUID, e.BALANCE, p.name AS player_name" +
-                " FROM " + tablePrefix + "economy e" +
+                " FROM " + table("economy") + " e" +
                 " LEFT JOIN rvnk_players p ON e.UUID = p.uuid" +
                 " ORDER BY e.BALANCE DESC LIMIT ?")) {
             stmt.setInt(1, limit);
@@ -190,7 +185,7 @@ public class MySQLDataStore implements DataStore {
     public boolean playerExists(Player player) {
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
-                "SELECT 1 FROM " + tablePrefix + "economy WHERE UUID = ?")) {
+                "SELECT 1 FROM " + table("economy") + " WHERE UUID = ?")) {
             stmt.setString(1, player.getUniqueId().toString());
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
@@ -204,7 +199,7 @@ public class MySQLDataStore implements DataStore {
     public boolean playerExistsByUUID(UUID uuid) {
         try (Connection conn = connectionProvider.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
-                "SELECT 1 FROM " + tablePrefix + "economy WHERE UUID = ?")) {
+                "SELECT 1 FROM " + table("economy") + " WHERE UUID = ?")) {
             stmt.setString(1, uuid.toString());
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
@@ -224,7 +219,7 @@ public class MySQLDataStore implements DataStore {
     }
 
     private void createEconomyTable() throws SQLException {
-        String createTableSQL = "CREATE TABLE IF NOT EXISTS " + tablePrefix + "economy (" +
+        String createTableSQL = "CREATE TABLE IF NOT EXISTS " + table("economy") + " (" +
                 "UUID VARCHAR(36) NOT NULL," +
                 "BALANCE DOUBLE NOT NULL," +
                 "PRIMARY KEY (UUID)" +

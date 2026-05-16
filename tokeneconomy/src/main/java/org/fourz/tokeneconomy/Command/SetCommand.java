@@ -31,7 +31,7 @@ public class SetCommand extends BaseCommand {
 
         plugin.getDataConnector().setPlayerBalance(targetUUID, amount);
 
-        String formattedAmount = CurrencyFormatter.format(amount, plugin);
+        String formattedAmount = CurrencyFormatter.format(amount, plugin.currencyNameSingular(), plugin.currencyNamePlural());
         sendSuccess(sender, "Set " + args[0] + "'s balance to " + formattedAmount);
         Player online = plugin.getServer().getPlayer(targetUUID);
         if (online != null) sendSuccess(online, "Your balance has been set to " + formattedAmount);

@@ -46,7 +46,7 @@ public class PayCommand extends BaseCommand {
         plugin.getEconomy().withdrawPlayer(player, amount);
         plugin.getEconomy().depositPlayer(target, amount);
 
-        String formattedAmount = CurrencyFormatter.format(amount, plugin);
+        String formattedAmount = CurrencyFormatter.format(amount, plugin.currencyNameSingular(), plugin.currencyNamePlural());
         sendSuccess(sender, "You sent " + formattedAmount + " to " + target.getName() + ".");
         sendSuccess(target, "You received " + formattedAmount + " from " + sender.getName() + ".");
 

@@ -14,46 +14,28 @@ import org.fourz.tokeneconomy.ConfigLoader;
 
 import java.util.logging.Logger;
 
-public class SQLiteDataStore implements DataStore {
+public class SQLiteDataStore extends AbstractDataStore {
     private final ConnectionProvider connectionProvider;
     private final Logger logger;
     private final File dbPath;
     private final ConfigLoader configLoader;
     private final Plugin plugin;
-    private final String tablePrefix;
     private final String ECONOMY_TABLE;
 
     public SQLiteDataStore(ConnectionProvider connectionProvider, File dbPath, ConfigLoader configLoader, Plugin plugin) {
+        super(plugin.getConfig().getString("storage.sqlite.tablePrefix", ""));
         this.connectionProvider = connectionProvider;
         this.dbPath = dbPath;
         this.configLoader = configLoader;
         this.plugin = plugin;
         this.logger = plugin.getLogger();
 
-        // Load table prefix from config
-        this.tablePrefix = plugin.getConfig().getString("storage.sqlite.tablePrefix", "");
-        if (tablePrefix != null && !tablePrefix.isEmpty()) {
-            logger.info("Using table prefix: " + tablePrefix);
+        String prefix = getTablePrefix();
+        if (!prefix.isEmpty()) {
+            logger.info("Using table prefix: " + prefix);
         }
 
-        // Initialize prefixed table name
         this.ECONOMY_TABLE = table("economy");
-    }
-
-    /**
-     * Get the table name with prefix applied.
-     * @param baseName The base table name (e.g., "economy")
-     * @return The prefixed table name (e.g., "token_economy")
-     */
-    private String table(String baseName) {
-        if (tablePrefix == null || tablePrefix.isEmpty()) {
-            return baseName;
-        }
-        return tablePrefix + baseName;
-    }
-
-    public String getTablePrefix() {
-        return tablePrefix;
     }
 
     public void setupDatabase() {
@@ -173,7 +155,8 @@ public class SQLiteDataStore implements DataStore {
             stmt.setDouble(3, balance);
             stmt.executeUpdate();
         } catch (SQLException e) {
-            logger.warning("Failed to set player balance: " + e.getMessage());
+            logger.severe("Failed to set player balance: " + e.getMessage());
+            throw new RuntimeException("Failed to set balance", e);
         }
     }
 

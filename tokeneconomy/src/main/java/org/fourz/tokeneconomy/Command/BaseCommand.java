@@ -35,15 +35,22 @@ public abstract class BaseCommand implements CommandExecutor, TabCompleter {
 
     // Common permission check - Console bypasses all permissions
     protected boolean checkPermission(CommandSender sender, String permission) {
-        // Console always has permission
-        if (sender instanceof ConsoleCommandSender) {
-            return true;
-        }
+        if (sender instanceof ConsoleCommandSender) return true;
         if (!sender.hasPermission("tokeneconomy." + permission)) {
             sendError(sender, "You don't have permission to use this command.");
             return false;
         }
         return true;
+    }
+
+    // Pass when the sender holds ANY of the given tokeneconomy.* nodes
+    protected boolean checkAnyPermission(CommandSender sender, String... permissions) {
+        if (sender instanceof ConsoleCommandSender) return true;
+        for (String p : permissions) {
+            if (sender.hasPermission("tokeneconomy." + p)) return true;
+        }
+        sendError(sender, "You don't have permission to use this command.");
+        return false;
     }
 
     // Common player validation — online-only (kept for backward compat)

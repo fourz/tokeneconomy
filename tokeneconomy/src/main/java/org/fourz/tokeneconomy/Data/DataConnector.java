@@ -31,6 +31,7 @@ public class DataConnector {
         this.configLoader = ((TokenEconomy)plugin).getConfigLoader();
         String storageType = configLoader.getStorageType();
         String migrationStatus = configLoader.getMigrationStatus();
+        boolean migrationFailed = false;
 
         if (configLoader.shouldMigrateFromMySQL()) {
             if (!migrationStatus.equals("completed")) {
@@ -63,6 +64,7 @@ public class DataConnector {
                     logger.severe("Migration failed: " + e.getMessage());
                     e.printStackTrace();
                     configLoader.setMigrationStatus("failed");
+                    migrationFailed = true;
                     // Fallback to SQLite if MySQL migration fails
                     logger.info("Falling back to SQLite storage.");
                     storageType = "sqlite";
@@ -107,6 +109,7 @@ public class DataConnector {
                     logger.severe("Migration failed: " + e.getMessage());
                     e.printStackTrace();
                     configLoader.setMigrationStatus("failed");
+                    migrationFailed = true;
                     // Fallback to SQLite if MySQL migration fails
                     logger.info("Falling back to SQLite storage.");
                     storageType = "sqlite";
@@ -121,7 +124,10 @@ public class DataConnector {
                 storageType = "mysql";
             }
         }
-        configLoader.setMigrationStatus("none");
+        // Preserve 'failed' status for post-mortem diagnosis; only clear on clean paths
+        if (!migrationFailed) {
+            configLoader.setMigrationStatus("none");
+        }
 
         // Initialize dataStore based on the (possibly updated) storageType
         switch (storageType) {

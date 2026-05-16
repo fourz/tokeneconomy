@@ -15,14 +15,12 @@ import net.milkbowl.vault.economy.Economy;
 import org.fourz.tokeneconomy.service.EconomyServiceImpl;
 
 import java.util.Map;
-import java.util.LinkedHashMap;
 import java.util.logging.Level;
 
 public class TokenEconomy extends JavaPlugin {
     // These components are separated to maintain single responsibility principle and improve maintainability
     private ConfigLoader configLoader;
     private DataConnector dataConnector;
-    private Map<String, Double> playerBalances = new LinkedHashMap<>();
     private boolean rvnkCoreAvailable = false;
     private Object rvnkCoreInstance = null;
 
@@ -169,10 +167,6 @@ public class TokenEconomy extends JavaPlugin {
 
     public String currencySymbol() {
         return configLoader.getCurrencySymbol();
-    }
-
-    public String getDenomination(double amount) {
-        return amount == 1 ? currencyNameSingular() : currencyNamePlural();
     }
 
     public Map<String, Double> getTopBalances() {

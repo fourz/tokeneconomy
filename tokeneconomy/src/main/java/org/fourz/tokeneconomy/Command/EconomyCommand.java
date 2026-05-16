@@ -5,7 +5,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
-import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.util.StringUtil;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
@@ -64,14 +63,6 @@ public class EconomyCommand implements CommandExecutor, TabCompleter {
         if (cmd == null) {
             sender.sendMessage(ChatColor.RED + "Unknown command. Use /economy help for available commands");
             return true;
-        }
-
-        // bug-03 fix: Bypass permission check for console
-        if (!(sender instanceof ConsoleCommandSender)) {
-            if (!sender.hasPermission("tokeneconomy." + subCommand)) {
-                sender.sendMessage(ChatColor.RED + "You don't have permission to use this command.");
-                return true;
-            }
         }
 
         // Execute command with remaining arguments

@@ -30,10 +30,7 @@ public class DebugCommand extends BaseCommand {
 
     @Override
     public boolean execute(CommandSender sender, String[] args) {
-        if (!sender.hasPermission("tokeneconomy.debug") && !sender.hasPermission("tokeneconomy.admin")) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission to use this command.");
-            return true;
-        }
+        if (!checkAnyPermission(sender, "debug", "admin")) return true;
 
         // Check for subcommands
         if (args.length > 0) {
@@ -65,7 +62,7 @@ public class DebugCommand extends BaseCommand {
         for (Map.Entry<String, Double> entry : topBalances.entrySet()) {
             sender.sendMessage(ChatColor.GOLD + String.valueOf(rank++) + ". " +
                 ChatColor.WHITE + entry.getKey() + ": " +
-                CurrencyFormatter.format(entry.getValue(), plugin));
+                CurrencyFormatter.format(entry.getValue(), plugin.currencyNameSingular(), plugin.currencyNamePlural()));
         }
 
         // Total number of records

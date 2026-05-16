@@ -25,6 +25,7 @@ public class EconomyTestDataGenerator extends TestDataGenerator {
     private final ExecutorService executor;
     private final String tablePrefix;
     private final boolean isMySQL;
+    private int seededCount = 0;
 
     /**
      * Create a new EconomyTestDataGenerator.
@@ -146,6 +147,7 @@ public class EconomyTestDataGenerator extends TestDataGenerator {
             stmt.executeBatch();
         }
         logSeeded("economy", inserted);
+        seededCount = inserted;
         return inserted;
     }
 
@@ -188,20 +190,21 @@ public class EconomyTestDataGenerator extends TestDataGenerator {
                 conn.setAutoCommit(false);
 
                 try {
-                    // Delete test records - test UUIDs are deterministic from testUUID()
-                    // We identify them by checking against known test UUID patterns
-                    // Since we use UUID.nameUUIDFromBytes("test-N"), we can rebuild them
-                    StringBuilder inClause = new StringBuilder();
-                    for (int i = 0; i < 1000; i++) {
-                        if (i > 0) inClause.append(",");
-                        inClause.append("'").append(testUUID(i).toString()).append("'");
-                    }
-
-                    String sql = "DELETE FROM " + table("economy") +
-                        " WHERE UUID IN (" + inClause + ")";
+                    // Delete only the test records that were actually seeded.
+                    // seededCount tracks the last seed run; falls back to 1000 (STRESS max)
+                    // when this generator is fresh after a server restart.
+                    int deleteCount = seededCount > 0 ? seededCount : 1000;
+                    String sql = "DELETE FROM " + table("economy") + " WHERE UUID = ?";
+                    int deleted = 0;
                     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                        int deleted = stmt.executeUpdate();
-                        logInfo("Deleted " + deleted + " records from economy");
+                        for (int i = 0; i < deleteCount; i++) {
+                            stmt.setString(1, testUUID(i).toString());
+                            stmt.addBatch();
+                            if (i > 0 && i % 100 == 0) stmt.executeBatch();
+                        }
+                        stmt.executeBatch();
+                        deleted = deleteCount; // executeBatch returns per-statement counts
+                        logInfo("Deleted up to " + deleted + " records from economy");
                     }
 
                     conn.commit();
