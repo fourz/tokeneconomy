@@ -41,21 +41,8 @@ public class MySQLDataStore extends AbstractDataStore {
         connectionProvider.close();
     }
 
-    public double getPlayerBalanceByUUID(UUID playerUUID) {
-        try (Connection conn = connectionProvider.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "SELECT BALANCE FROM " + table("economy") + " WHERE UUID = ?")) {
-            stmt.setString(1, playerUUID.toString());
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getDouble("BALANCE");
-                }
-            }
-        } catch (SQLException e) {
-            logger.warning("Failed to retrieve player balance: " + e.getMessage());
-        }
-        return 0.0;
-    }
+    @Override
+    protected Logger getLogger() { return logger; }
 
     public boolean changePlayerBalance(UUID playerUUID, double amount) {
         try (Connection conn = connectionProvider.getConnection()) {
@@ -184,10 +171,6 @@ public class MySQLDataStore extends AbstractDataStore {
     @Override
     public java.sql.Connection getConnection() throws java.sql.SQLException {
         return connectionProvider.getConnection();
-    }
-
-    public ConnectionProvider getConnectionProvider() {
-        return connectionProvider;
     }
 
     private void createEconomyTable() throws SQLException {

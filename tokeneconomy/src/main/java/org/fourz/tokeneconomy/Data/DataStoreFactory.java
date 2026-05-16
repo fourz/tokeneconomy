@@ -27,7 +27,6 @@ public class DataStoreFactory {
                 return new SQLiteDataStore(
                     createProvider("sqlite"),
                     new File(plugin.getDataFolder(), "database.db"),
-                    configLoader,
                     plugin);
         }
     }

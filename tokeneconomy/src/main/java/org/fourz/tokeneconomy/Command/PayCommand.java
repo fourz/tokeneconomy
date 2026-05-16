@@ -12,12 +12,12 @@ public class PayCommand extends BaseCommand {
 
     @Override
     protected boolean execute(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) {
-            sendError(sender, "Only players can use the pay command.");
+        if (!checkPermission(sender, "pay")) {
             return true;
         }
 
-        if (!checkPermission(sender, "pay")) {
+        if (!(sender instanceof Player)) {
+            sendError(sender, "Only players can use the pay command.");
             return true;
         }
 

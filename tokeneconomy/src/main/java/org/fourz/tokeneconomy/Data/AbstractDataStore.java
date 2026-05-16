@@ -1,9 +1,12 @@
 package org.fourz.tokeneconomy.Data;
 
-/**
- * Base class for DataStore implementations — provides the shared table()
- * helper so neither MySQLDataStore nor SQLiteDataStore need their own copy.
- */
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.UUID;
+import java.util.logging.Logger;
+
 public abstract class AbstractDataStore implements DataStore {
 
     private final String tablePrefix;
@@ -12,12 +15,29 @@ public abstract class AbstractDataStore implements DataStore {
         this.tablePrefix = tablePrefix != null ? tablePrefix : "";
     }
 
-    /** Returns the prefixed table name (e.g. "token_economy" from prefix "token_" + "economy"). */
     protected String table(String baseName) {
         return tablePrefix.isEmpty() ? baseName : tablePrefix + baseName;
     }
 
+    @Override
     public String getTablePrefix() {
         return tablePrefix;
     }
+
+    @Override
+    public double getPlayerBalanceByUUID(UUID playerUUID) {
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                "SELECT BALANCE FROM " + table("economy") + " WHERE UUID = ?")) {
+            stmt.setString(1, playerUUID.toString());
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return rs.getDouble("BALANCE");
+            }
+        } catch (SQLException e) {
+            getLogger().warning("Failed to retrieve player balance: " + e.getMessage());
+        }
+        return 0.0;
+    }
+
+    protected abstract Logger getLogger();
 }

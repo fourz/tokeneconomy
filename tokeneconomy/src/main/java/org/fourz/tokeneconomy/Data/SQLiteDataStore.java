@@ -9,7 +9,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.Plugin;
 import org.fourz.rvnkcore.database.connection.ConnectionProvider;
-import org.fourz.tokeneconomy.ConfigLoader;
 
 import java.util.logging.Logger;
 
@@ -17,15 +16,13 @@ public class SQLiteDataStore extends AbstractDataStore {
     private final ConnectionProvider connectionProvider;
     private final Logger logger;
     private final File dbPath;
-    private final ConfigLoader configLoader;
     private final Plugin plugin;
     private final String ECONOMY_TABLE;
 
-    public SQLiteDataStore(ConnectionProvider connectionProvider, File dbPath, ConfigLoader configLoader, Plugin plugin) {
+    public SQLiteDataStore(ConnectionProvider connectionProvider, File dbPath, Plugin plugin) {
         super(plugin.getConfig().getString("storage.sqlite.tablePrefix", ""));
         this.connectionProvider = connectionProvider;
         this.dbPath = dbPath;
-        this.configLoader = configLoader;
         this.plugin = plugin;
         this.logger = plugin.getLogger();
 
@@ -40,9 +37,6 @@ public class SQLiteDataStore extends AbstractDataStore {
     public void setupDatabase() {
         try {
             ensureDataFolderExists();
-            if (configLoader.shouldMigrateOldEconomy()) {
-                new LegacyDatabaseMigrator(dbPath, logger).migrate();
-            }
             createEconomyTable();
             logger.info("SQLite database setup successful.");
         } catch (SQLException e) {
@@ -59,21 +53,8 @@ public class SQLiteDataStore extends AbstractDataStore {
         connectionProvider.close();
     }
 
-    public double getPlayerBalanceByUUID(UUID playerUUID) {
-        try (Connection conn = connectionProvider.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(
-                "SELECT BALANCE FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
-            stmt.setString(1, playerUUID.toString());
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getDouble("BALANCE");
-                }
-            }
-        } catch (SQLException e) {
-            logger.warning("Failed to retrieve player balance: " + e.getMessage());
-        }
-        return 0.0;
-    }
+    @Override
+    protected Logger getLogger() { return logger; }
 
     public boolean changePlayerBalance(UUID playerUUID, double amount) {
         try (Connection conn = connectionProvider.getConnection()) {
@@ -202,10 +183,6 @@ public class SQLiteDataStore extends AbstractDataStore {
     @Override
     public java.sql.Connection getConnection() throws java.sql.SQLException {
         return connectionProvider.getConnection();
-    }
-
-    public ConnectionProvider getConnectionProvider() {
-        return connectionProvider;
     }
 
     private void ensureDataFolderExists() {

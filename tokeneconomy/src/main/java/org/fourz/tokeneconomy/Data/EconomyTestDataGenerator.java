@@ -152,14 +152,6 @@ public class EconomyTestDataGenerator extends TestDataGenerator {
         }
     }
 
-    /**
-     * Seed the economy table. Kept for backward compatibility with SeedCommand.
-     * Delegates to the standard seed method.
-     */
-    public CompletableFuture<Integer> seedLegacyEconomy(DataCategory category) {
-        return seed(category);
-    }
-
     @Override
     public CompletableFuture<Boolean> cleanup() {
         return CompletableFuture.supplyAsync(() -> {

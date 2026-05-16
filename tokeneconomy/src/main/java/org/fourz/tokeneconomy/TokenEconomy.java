@@ -7,11 +7,9 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.fourz.tokeneconomy.Command.BalanceCommand;
-import org.fourz.tokeneconomy.Command.BukkitPlayerResolver;
 import org.fourz.tokeneconomy.Command.EconomyCommand;
 import org.fourz.tokeneconomy.Command.PayCommand;
 import org.fourz.tokeneconomy.Command.PlayerResolver;
-import org.fourz.tokeneconomy.Command.RVNKCorePlayerResolver;
 import org.fourz.tokeneconomy.Data.DataConnector;
 
 import net.milkbowl.vault.economy.Economy;
@@ -117,7 +115,7 @@ public class TokenEconomy extends JavaPlugin {
     }
 
     private void registerCommands() {
-        PlayerResolver resolver = createPlayerResolver();
+        PlayerResolver resolver = PlayerResolver.create(getServer(), getLogger());
         if (getCommand("economy") != null) {
             getCommand("economy").setExecutor(new EconomyCommand(this));
         }
@@ -128,15 +126,6 @@ public class TokenEconomy extends JavaPlugin {
             getCommand("pay").setExecutor(new PayCommand(this, resolver));
         }
         getLogger().info("Commands registered successfully.");
-    }
-
-    private PlayerResolver createPlayerResolver() {
-        try {
-            Class.forName("org.fourz.rvnkcore.RVNKCore");
-            return new RVNKCorePlayerResolver(getServer(), getLogger());
-        } catch (ClassNotFoundException e) {
-            return new BukkitPlayerResolver(getServer());
-        }
     }
 
     private void registerGriefProtectionHook() {
