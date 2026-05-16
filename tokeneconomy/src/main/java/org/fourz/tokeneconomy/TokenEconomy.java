@@ -151,7 +151,7 @@ public class TokenEconomy extends JavaPlugin {
 
     // Utility methods for accessing and managing player balances and economy settings
     public double getPlayerBalance(Player player) {
-        return dataConnector != null ? dataConnector.getPlayerBalance(player) : 0.0;
+        return dataConnector != null ? dataConnector.getPlayerBalanceByUUID(player.getUniqueId()) : 0.0;
     }
 
     public DataConnector getDataConnector() {

@@ -181,6 +181,11 @@ public class MySQLDataStore extends AbstractDataStore {
      * Get the connection provider for direct access (used by test generators).
      * @return the ConnectionProvider
      */
+    @Override
+    public java.sql.Connection getConnection() throws java.sql.SQLException {
+        return connectionProvider.getConnection();
+    }
+
     public ConnectionProvider getConnectionProvider() {
         return connectionProvider;
     }

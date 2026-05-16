@@ -27,6 +27,14 @@ import java.util.UUID;
  */
 public class SeedCommand extends BaseCommand {
 
+    private enum SeedAction {
+        MINIMAL, STANDARD, STRESS, CLEANUP, STATUS, LEGACY;
+
+        static SeedAction from(String s) {
+            try { return valueOf(s.toUpperCase()); } catch (IllegalArgumentException e) { return null; }
+        }
+    }
+
     private static final List<String> ACTIONS = Arrays.asList("minimal", "standard", "stress", "cleanup", "status", "legacy");
 
     private EconomyTestDataGenerator generator;
@@ -45,7 +53,12 @@ public class SeedCommand extends BaseCommand {
             return true;
         }
 
-        String action = args[0].toLowerCase();
+        SeedAction action = SeedAction.from(args[0]);
+        if (action == null) {
+            sender.sendMessage(ChatColor.RED + "Unknown action: " + args[0]);
+            showUsage(sender);
+            return true;
+        }
 
         // Initialize generator if needed
         DataStore dataStore = plugin.getDataConnector().getDataStore();
@@ -59,22 +72,18 @@ public class SeedCommand extends BaseCommand {
         }
 
         switch (action) {
-            case "minimal":
-            case "standard":
-            case "stress":
-                return executeSeed(sender, DataCategory.valueOf(action.toUpperCase()));
-            case "cleanup":
-                if (args.length > 1) {
-                    return executeCleanupPlayer(sender, args[1]);
-                }
-                return executeCleanup(sender);
-            case "status":
+            case MINIMAL:
+            case STANDARD:
+            case STRESS:
+                return executeSeed(sender, DataCategory.valueOf(action.name()));
+            case CLEANUP:
+                return args.length > 1 ? executeCleanupPlayer(sender, args[1]) : executeCleanup(sender);
+            case STATUS:
                 return executeStatus(sender);
-            case "legacy":
+            case LEGACY:
                 if (args.length > 1) {
-                    String category = args[1].toUpperCase();
                     try {
-                        return executeLegacySeed(sender, DataCategory.valueOf(category));
+                        return executeLegacySeed(sender, DataCategory.valueOf(args[1].toUpperCase()));
                     } catch (IllegalArgumentException e) {
                         sender.sendMessage(ChatColor.RED + "Invalid category: " + args[1]);
                         return true;
@@ -83,7 +92,6 @@ public class SeedCommand extends BaseCommand {
                 sender.sendMessage(ChatColor.RED + "Usage: /eco debug seed legacy <minimal|standard|stress>");
                 return true;
             default:
-                sender.sendMessage(ChatColor.RED + "Unknown action: " + action);
                 showUsage(sender);
                 return true;
         }

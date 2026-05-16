@@ -1,8 +1,9 @@
 package org.fourz.tokeneconomy.Data;
 
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.Map;
 import java.util.UUID;
-import java.sql.SQLException;
 
 public interface DataStore {
     void setupDatabase();
@@ -15,4 +16,6 @@ public interface DataStore {
     Map<String, Double> getAllPlayerBalances();
     boolean isConnected() throws SQLException;
     boolean playerExistsByUUID(UUID uuid);
+    Connection getConnection() throws SQLException;
+    String getTablePrefix();
 }

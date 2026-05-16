@@ -1,191 +1,29 @@
 package org.fourz.tokeneconomy.Data;
 
 import org.bukkit.plugin.Plugin;
-import org.fourz.rvnkcore.database.config.DatabaseConfig;
-import org.fourz.rvnkcore.database.connection.ConnectionProvider;
-import org.fourz.rvnkcore.database.connection.ConnectionProviderFactory;
 import org.fourz.tokeneconomy.ConfigLoader;
 import org.fourz.tokeneconomy.TokenEconomy;
-import org.bukkit.entity.Player;
-import java.sql.*;
-import java.io.File;
+
+import java.sql.SQLException;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Logger;
 
-/**
- * Handles all database operations for the TokenEconomy plugin.
- * Delegates connection management to RVNKCore's ConnectionProvider.
- */
 public class DataConnector {
 
     private final Logger logger;
-    private final Plugin plugin;
-    private final ConfigLoader configLoader;
     private DataStore dataStore;
 
     public DataConnector(Plugin plugin) {
-        this.plugin = plugin;
         this.logger = plugin.getLogger();
+        ConfigLoader configLoader = ((TokenEconomy) plugin).getConfigLoader();
+        DataStoreFactory factory = new DataStoreFactory(plugin, configLoader);
+        DataStoreMigrationService migrationService = new DataStoreMigrationService(plugin, configLoader, factory);
 
-        this.configLoader = ((TokenEconomy)plugin).getConfigLoader();
-        String storageType = configLoader.getStorageType();
-        String migrationStatus = configLoader.getMigrationStatus();
-        boolean migrationFailed = false;
-
-        if (configLoader.shouldMigrateFromMySQL()) {
-            if (!migrationStatus.equals("completed")) {
-                logger.info("Starting migration from MySQL to SQLite.");
-                configLoader.setMigrationStatus("in_progress");
-                try {
-                    DataStore sourceStore = new MySQLDataStore(createProvider("mysql"), configLoader, plugin);
-                    DataStore targetStore = new SQLiteDataStore(
-                        createProvider("sqlite"),
-                        new File(plugin.getDataFolder(), "database.db"), configLoader, plugin);
-
-                    // Test source connection before proceeding
-                    if (!testConnection(sourceStore)) {
-                        throw new SQLException("Could not establish connection to source MySQL database");
-                    }
-
-                    sourceStore.setupDatabase();
-                    targetStore.setupDatabase();
-                    migrateData(sourceStore, targetStore);
-                    sourceStore.closeDatabase();
-                    targetStore.closeDatabase();
-
-                    configLoader.setMigrationStatus("completed");
-                    plugin.getConfig().set("storage.migrate_from_mysql", false);
-                    plugin.getConfig().set("storage.type", "sqlite");
-                    plugin.saveConfig();
-                    logger.info("Migration from MySQL to SQLite completed successfully.");
-                    storageType = "sqlite";
-                } catch (Exception e) {
-                    logger.severe("Migration failed: " + e.getMessage());
-                    e.printStackTrace();
-                    configLoader.setMigrationStatus("failed");
-                    migrationFailed = true;
-                    // Fallback to SQLite if MySQL migration fails
-                    logger.info("Falling back to SQLite storage.");
-                    storageType = "sqlite";
-                    plugin.getConfig().set("storage.type", "sqlite");
-                    plugin.saveConfig();
-                }
-            } else {
-                logger.info("Migration from MySQL to SQLite already completed.");
-                plugin.getConfig().set("storage.migrate_from_mysql", false);
-                plugin.getConfig().set("storage.type", "sqlite");
-                plugin.saveConfig();
-                storageType = "sqlite";
-            }
-        } else if (configLoader.shouldMigrateFromSQLite()) {
-            if (!migrationStatus.equals("completed")) {
-                logger.info("Starting migration from SQLite to MySQL.");
-                configLoader.setMigrationStatus("in_progress");
-                try {
-                    DataStore sourceStore = new SQLiteDataStore(
-                        createProvider("sqlite"),
-                        new File(plugin.getDataFolder(), "database.db"), configLoader, plugin);
-                    DataStore targetStore = new MySQLDataStore(createProvider("mysql"), configLoader, plugin);
-
-                    // Test target connection before proceeding
-                    if (!testConnection(targetStore)) {
-                        throw new SQLException("Could not establish connection to target MySQL database");
-                    }
-
-                    sourceStore.setupDatabase();
-                    targetStore.setupDatabase();
-                    migrateData(sourceStore, targetStore);
-                    sourceStore.closeDatabase();
-                    targetStore.closeDatabase();
-
-                    configLoader.setMigrationStatus("completed");
-                    plugin.getConfig().set("storage.migrate_from_sqlite", false);
-                    plugin.getConfig().set("storage.type", "mysql");
-                    plugin.saveConfig();
-                    logger.info("Migration from SQLite to MySQL completed successfully.");
-                    storageType = "mysql";
-                } catch (Exception e) {
-                    logger.severe("Migration failed: " + e.getMessage());
-                    e.printStackTrace();
-                    configLoader.setMigrationStatus("failed");
-                    migrationFailed = true;
-                    // Fallback to SQLite if MySQL migration fails
-                    logger.info("Falling back to SQLite storage.");
-                    storageType = "sqlite";
-                    plugin.getConfig().set("storage.type", "sqlite");
-                    plugin.saveConfig();
-                }
-            } else {
-                logger.info("Migration from SQLite to MySQL already completed.");
-                plugin.getConfig().set("storage.migrate_from_sqlite", false);
-                plugin.getConfig().set("storage.type", "mysql");
-                plugin.saveConfig();
-                storageType = "mysql";
-            }
-        }
-        // Preserve 'failed' status for post-mortem diagnosis; only clear on clean paths
-        if (!migrationFailed) {
-            configLoader.setMigrationStatus("none");
-        }
-
-        // Initialize dataStore based on the (possibly updated) storageType
-        switch (storageType) {
-            case "mysql":
-                dataStore = new MySQLDataStore(createProvider("mysql"), configLoader, plugin);
-                break;
-            case "sqlite":
-                dataStore = new SQLiteDataStore(
-                    createProvider("sqlite"),
-                    new File(plugin.getDataFolder(), "database.db"), configLoader, plugin);
-                break;
-            default:
-                logger.severe("Invalid storage type in config.yml: " + storageType);
-                break;
-        }
+        String storageType = migrationService.applyMigrations(configLoader.getStorageType());
+        this.dataStore = factory.create(storageType);
     }
 
-    /**
-     * Creates a ConnectionProvider for the given storage type using RVNKCore's factory.
-     */
-    private ConnectionProvider createProvider(String storageType) {
-        ConnectionProviderFactory factory = new ConnectionProviderFactory(plugin);
-        DatabaseConfig config;
-        if ("mysql".equals(storageType)) {
-            config = DatabaseConfig.builder()
-                .type("mysql")
-                .host(configLoader.getMySQLHost())
-                .port(configLoader.getMySQLPort())
-                .database(configLoader.getMySQLDatabase())
-                .username(configLoader.getMySQLUsername())
-                .password(configLoader.getMySQLPassword())
-                .useSSL(configLoader.getMySQLUseSSL())
-                .connectionTimeoutMs(configLoader.getMySQLConnectionTimeout() > 0
-                    ? configLoader.getMySQLConnectionTimeout() * 1000L : 30000L)
-                .build();
-        } else {
-            config = DatabaseConfig.sqlite("database.db");
-        }
-        return factory.createConnectionProvider(config);
-    }
-
-    /**
-     * Verifies if there's an active database connection.
-     * @return true if connection exists and is valid, false otherwise
-     */
-    private boolean isConnected() {
-        try {
-            return dataStore.isConnected();
-        } catch (SQLException e) {
-            logger.severe("Failed to check connection status: " + e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Initializes the database, creates required tables, and handles migration
-     * from older versions of the plugin if necessary.
-     */
     public void setupDatabase() {
         dataStore.setupDatabase();
     }
@@ -198,10 +36,6 @@ public class DataConnector {
         dataStore.closeDatabase();
     }
 
-    public double getPlayerBalance(Player player) {
-        return dataStore.getPlayerBalanceByUUID(player.getUniqueId());
-    }
-
     public double getPlayerBalanceByUUID(UUID playerUUID) {
         return dataStore.getPlayerBalanceByUUID(playerUUID);
     }
@@ -210,129 +44,31 @@ public class DataConnector {
         return dataStore.changePlayerBalance(playerUUID, amount);
     }
 
-    public boolean playerExists(Player player) {
-        return dataStore.playerExistsByUUID(player.getUniqueId());
-    }
-
-    public void setPlayerBalance(Player player, double balance) {
-        dataStore.setPlayerBalance(player.getUniqueId(), balance);
-    }
-
     public void setPlayerBalance(UUID uuid, double balance) {
         dataStore.setPlayerBalance(uuid, balance);
     }
 
-    /**
-     * Checks whether a player account exists by UUID.
-     * Works for both online and offline players.
-     * @param uuid The player's UUID
-     * @return true if the player has an economy record
-     */
     public boolean playerExistsByUUID(UUID uuid) {
         return dataStore.playerExistsByUUID(uuid);
     }
 
-    /**
-     * Retrieves the top player balances in descending order.
-     * Returns a map of player names to their balances.
-     * @param limit Maximum number of entries to return
-     * @return LinkedHashMap maintaining insertion order of top balances
-     */
     public Map<String, Double> getTopBalances(int limit) {
         return dataStore.getTopBalances(limit);
     }
 
-    /**
-     * Retrieves all player balances from the database.
-     * @return Map of player UUIDs to their balances
-     */
     public Map<String, Double> getAllPlayerBalances() {
         return dataStore.getAllPlayerBalances();
     }
 
-    /**
-     * Get the active data store for direct access (used by test data generators).
-     * @return the active DataStore instance
-     */
     public DataStore getDataStore() {
         return dataStore;
     }
 
-    private void migrateData(DataStore sourceStore, DataStore targetStore) {
+    public boolean isConnected() {
         try {
-            // Initialize both stores before migration
-            logger.info("Attempting to initialize source database...");
-            if (!initializeStore(sourceStore)) {
-                throw new SQLException("Failed to initialize source database - check connection parameters and permissions");
-            }
-            logger.info("Source database initialized successfully");
-
-            logger.info("Attempting to initialize target database...");
-            if (!initializeStore(targetStore)) {
-                throw new SQLException("Failed to initialize target database - check connection parameters and permissions");
-            }
-            logger.info("Target database initialized successfully");
-
-            Map<String, Double> balances = sourceStore.getAllPlayerBalances();
-            int totalPlayers = balances.size();
-            int migratedPlayers = 0;
-            logger.info("Starting data migration for " + totalPlayers + " players.");
-
-            for (Map.Entry<String, Double> entry : balances.entrySet()) {
-                try {
-                    UUID playerUUID = UUID.fromString(entry.getKey());
-                    double balance = entry.getValue();
-                    targetStore.setPlayerBalance(playerUUID, balance);
-                    migratedPlayers++;
-
-                    if (migratedPlayers % 100 == 0) {
-                        logger.info("Migrated " + migratedPlayers + "/" + totalPlayers + " player balances.");
-                    }
-                } catch (Exception e) {
-                    logger.warning("Failed to migrate player " + entry.getKey() + ": " + e.getMessage());
-                }
-            }
-            logger.info("Data migration completed. Successfully migrated: " + migratedPlayers + "/" + totalPlayers + " player balances");
-
-            if (migratedPlayers < totalPlayers) {
-                logger.warning("Some player data failed to migrate. Check logs for details.");
-            }
+            return dataStore.isConnected();
         } catch (SQLException e) {
-            logger.severe("Migration failed due to database error: " + e.getMessage());
-            logger.severe("Database State - Source connected: " + connectionStatus(sourceStore) +
-                         ", Target connected: " + connectionStatus(targetStore));
-            throw new RuntimeException("Migration failed", e);
-        }
-    }
-
-    private String connectionStatus(DataStore store) {
-        try {
-            return store.isConnected() ? "Yes" : "No";
-        } catch (SQLException e) {
-            return "Error checking connection: " + e.getMessage();
-        }
-    }
-
-    private boolean initializeStore(DataStore store) {
-        try {
-            store.setupDatabase();
-            if (!testConnection(store)) {
-                logger.severe("Failed to initialize database connection");
-                return false;
-            }
-            return true;
-        } catch (Exception e) {
-            logger.severe("Failed to initialize database: " + e.getMessage());
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-    private boolean testConnection(DataStore store) {
-        try {
-            return store.isConnected();
-        } catch (SQLException e) {
-            logger.severe("Connection test failed: " + e.getMessage());
+            logger.severe("Failed to check connection status: " + e.getMessage());
             return false;
         }
     }

@@ -10,7 +10,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
-import java.lang.reflect.Method;
 
 /**
  * Test data generator for TokenEconomy plugin.
@@ -38,17 +37,8 @@ public class EconomyTestDataGenerator extends TestDataGenerator {
             () -> dataStore instanceof MySQLDataStore,
             () -> {
                 try {
-                    if (dataStore instanceof MySQLDataStore) {
-                        // HikariCP pool: getDataSource().getConnection()
-                        Method getDataSourceMethod = dataStore.getClass().getMethod("getDataSource");
-                        Object ds = getDataSourceMethod.invoke(dataStore);
-                        return (Connection) ds.getClass().getMethod("getConnection").invoke(ds);
-                    } else {
-                        // SQLite: direct getConnection()
-                        Method getConnectionMethod = dataStore.getClass().getMethod("getConnection");
-                        return (Connection) getConnectionMethod.invoke(dataStore);
-                    }
-                } catch (Exception e) {
+                    return dataStore.getConnection();
+                } catch (SQLException e) {
                     throw new RuntimeException("Failed to get connection", e);
                 }
             }
@@ -56,17 +46,7 @@ public class EconomyTestDataGenerator extends TestDataGenerator {
         this.dataStore = dataStore;
         this.executor = Executors.newSingleThreadExecutor();
         this.isMySQL = dataStore instanceof MySQLDataStore;
-
-        // Get table prefix via reflection (may not exist on all implementations)
-        String prefix = "";
-        try {
-            Method getPrefixMethod = dataStore.getClass().getDeclaredMethod("getTablePrefix");
-            getPrefixMethod.setAccessible(true);
-            prefix = (String) getPrefixMethod.invoke(dataStore);
-        } catch (Exception e) {
-            // Prefix method may not exist, use empty
-        }
-        this.tablePrefix = prefix != null ? prefix : "";
+        this.tablePrefix = dataStore.getTablePrefix();
     }
 
     /**

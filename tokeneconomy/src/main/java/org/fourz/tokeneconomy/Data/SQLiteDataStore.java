@@ -199,6 +199,11 @@ public class SQLiteDataStore extends AbstractDataStore {
         }
     }
 
+    @Override
+    public java.sql.Connection getConnection() throws java.sql.SQLException {
+        return connectionProvider.getConnection();
+    }
+
     public ConnectionProvider getConnectionProvider() {
         return connectionProvider;
     }
