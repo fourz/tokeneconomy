@@ -1,6 +1,6 @@
 name: TokenEconomy
 version: '${project.version}'
-api-version: 1.21
+api-version: '26.1'
 description: This is a simple Bukkit Plugin
 author: fourz
 

@@ -48,10 +48,10 @@
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-            <version>1.21.4-R0.1-SNAPSHOT</version>
+            <version>26.1.2-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
-        
+
         <!-- Vault API -->
         <dependency>
             <groupId>com.github.MilkBowl</groupId>
@@ -72,7 +72,7 @@
         <dependency>
             <groupId>org.fourz</groupId>
             <artifactId>rvnkcore</artifactId>
-            <version>1.4.10-alpha</version>
+            <version>1.5.6-alpha</version>
             <scope>provided</scope>
         </dependency>
 
