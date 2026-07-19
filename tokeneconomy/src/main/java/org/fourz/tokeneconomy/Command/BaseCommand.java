@@ -12,12 +12,17 @@ import org.fourz.tokeneconomy.TokenEconomy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 
 public abstract class BaseCommand implements CommandExecutor, TabCompleter {
     protected final TokenEconomy plugin;
+    private final PlayerResolver playerResolver;
 
-    public BaseCommand(TokenEconomy plugin) {
+    public BaseCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
         this.plugin = plugin;
+        this.playerResolver = playerResolver;
     }
 
     @Override
@@ -29,10 +34,7 @@ public abstract class BaseCommand implements CommandExecutor, TabCompleter {
 
     // Common permission check - Console bypasses all permissions
     protected boolean checkPermission(CommandSender sender, String permission) {
-        // Console always has permission
-        if (sender instanceof ConsoleCommandSender) {
-            return true;
-        }
+        if (sender instanceof ConsoleCommandSender) return true;
         if (!sender.hasPermission("tokeneconomy." + permission)) {
             sendError(sender, "You don't have permission to use this command.");
             return false;
@@ -40,13 +42,32 @@ public abstract class BaseCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    // Common player validation
+    // Pass when the sender holds ANY of the given tokeneconomy.* nodes
+    protected boolean checkAnyPermission(CommandSender sender, String... permissions) {
+        if (sender instanceof ConsoleCommandSender) return true;
+        for (String p : permissions) {
+            if (sender.hasPermission("tokeneconomy." + p)) return true;
+        }
+        sendError(sender, "You don't have permission to use this command.");
+        return false;
+    }
+
+    // Common player validation — online-only (kept for backward compat)
     protected Player getTargetPlayer(CommandSender sender, String playerName) {
         Player target = plugin.getServer().getPlayer(playerName);
         if (target == null) {
             sendError(sender, "Player not found.");
         }
         return target;
+    }
+
+    protected UUID resolvePlayerUUID(CommandSender sender, String playerName) {
+        Optional<UUID> result = playerResolver.resolve(playerName);
+        if (result.isEmpty()) {
+            sendError(sender, "Player not found.");
+            return null;
+        }
+        return result.get();
     }
 
     // Common amount parsing

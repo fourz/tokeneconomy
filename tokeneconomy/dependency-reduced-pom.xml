@@ -4,7 +4,7 @@
   <groupId>org.fourz</groupId>
   <artifactId>tokeneconomy</artifactId>
   <name>TokenEconomy</name>
-  <version>1.1.4</version>
+  <version>1.1.6</version>
   <description>A Minecraft economy plugin with Vault and GriefPrevention integration.</description>
   <url>https://your-repo-url-here</url>
   <build>
@@ -46,12 +46,6 @@
               <goal>shade</goal>
             </goals>
             <configuration>
-              <relocations>
-                <relocation>
-                  <pattern>com.zaxxer.hikari</pattern>
-                  <shadedPattern>org.fourz.tokeneconomy.lib.hikari</shadedPattern>
-                </relocation>
-              </relocations>
               <filters>
                 <filter>
                   <artifact>*:*</artifact>
@@ -60,6 +54,16 @@
                   </excludes>
                 </filter>
               </filters>
+              <relocations>
+                <relocation>
+                  <pattern>com.zaxxer.hikari</pattern>
+                  <shadedPattern>org.fourz.tokeneconomy.shaded.hikari</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>com.mysql</pattern>
+                  <shadedPattern>org.fourz.tokeneconomy.shaded.mysql</shadedPattern>
+                </relocation>
+              </relocations>
             </configuration>
           </execution>
         </executions>
@@ -88,7 +92,7 @@
     <dependency>
       <groupId>org.spigotmc</groupId>
       <artifactId>spigot-api</artifactId>
-      <version>1.21.4-R0.1-SNAPSHOT</version>
+      <version>26.1.2-R0.1-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -106,8 +110,14 @@
     <dependency>
       <groupId>org.fourz</groupId>
       <artifactId>rvnkcore</artifactId>
-      <version>1.4.5-alpha</version>
+      <version>1.5.6-alpha</version>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>mysql</groupId>
+      <artifactId>mysql-connector-java</artifactId>
+      <version>8.0.33</version>
+      <scope>compile</scope>
     </dependency>
   </dependencies>
   <properties>

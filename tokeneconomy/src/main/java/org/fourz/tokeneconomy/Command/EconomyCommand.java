@@ -5,7 +5,6 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
-import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.util.StringUtil;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
@@ -32,14 +31,14 @@ public class EconomyCommand implements CommandExecutor, TabCompleter {
         this.plugin = plugin;
         this.commands = new HashMap<>();
 
-        // Initialize all available economy subcommands
-        commands.put("balance", new BalanceCommand(plugin));
-        commands.put("pay", new PayCommand(plugin));
-        commands.put("set", new SetCommand(plugin));
-        commands.put("add", new AddCommand(plugin));
-        commands.put("top", new TopCommand(plugin));
-        commands.put("debug", new DebugCommand(plugin));
-        commands.put("help", new HelpCommand(plugin));  // bug-02 fix: Register help command
+        PlayerResolver resolver = PlayerResolver.create(plugin.getServer(), plugin.getLogger());
+        commands.put("balance", new BalanceCommand(plugin, resolver));
+        commands.put("pay", new PayCommand(plugin, resolver));
+        commands.put("set", new SetCommand(plugin, resolver));
+        commands.put("add", new AddCommand(plugin, resolver));
+        commands.put("top", new TopCommand(plugin, resolver));
+        commands.put("debug", new DebugCommand(plugin, resolver));
+        commands.put("help", new HelpCommand(plugin, resolver));
     }
 
     @Override
@@ -64,14 +63,6 @@ public class EconomyCommand implements CommandExecutor, TabCompleter {
         if (cmd == null) {
             sender.sendMessage(ChatColor.RED + "Unknown command. Use /economy help for available commands");
             return true;
-        }
-
-        // bug-03 fix: Bypass permission check for console
-        if (!(sender instanceof ConsoleCommandSender)) {
-            if (!sender.hasPermission("tokeneconomy." + subCommand)) {
-                sender.sendMessage(ChatColor.RED + "You don't have permission to use this command.");
-                return true;
-            }
         }
 
         // Execute command with remaining arguments

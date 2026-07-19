@@ -1,11 +1,10 @@
 general:
   logLevel: WARNING
 
-# RVNKCore integration — exposes economy data to the RVNK plugin ecosystem.
-# Set enabled: false to run TokenEconomy as a fully standalone Vault economy plugin.
-integration:
-  rvnkcore:
-    enabled: true
+database:
+  # shared: borrow RVNKCore's HikariCP pool (RVNKCore must be present — hard fail if absent)
+  # standalone: own pool using storage.mysql.* / storage.sqlite.* config (works without RVNKCore)
+  mode: standalone
 
 economy:
   currencyNameSingular: Wizbuck

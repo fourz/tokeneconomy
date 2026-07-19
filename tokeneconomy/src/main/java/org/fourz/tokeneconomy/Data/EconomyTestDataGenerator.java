@@ -1,115 +1,87 @@
 package org.fourz.tokeneconomy.Data;
 
-import org.fourz.rvnkcore.testing.TestDataGenerator;
-
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Logger;
-import java.lang.reflect.Method;
 
 /**
- * Test data generator for TokenEconomy plugin.
- *
- * <p>Seeds the economy table with deterministic test data.
- * The economy table has a simple schema: UUID (TEXT PK), BALANCE (REAL).
- * </p>
+ * Seeds the economy table with deterministic test data.
+ * The economy table schema: UUID (TEXT/VARCHAR PK), BALANCE (REAL/DOUBLE).
  */
-public class EconomyTestDataGenerator extends TestDataGenerator {
+public class EconomyTestDataGenerator {
+
+    public enum DataCategory {
+        MINIMAL(10), STANDARD(100), STRESS(1000);
+
+        private final int baseCount;
+        DataCategory(int baseCount) { this.baseCount = baseCount; }
+        public int getBaseCount() { return baseCount; }
+
+        static DataCategory from(String s) {
+            try { return valueOf(s.toUpperCase()); } catch (IllegalArgumentException e) { return null; }
+        }
+    }
 
     private final DataStore dataStore;
     private final ExecutorService executor;
     private final String tablePrefix;
     private final boolean isMySQL;
+    private final Logger logger;
+    private final Random random = new Random(42);
+    private int seededCount = 0;
 
-    /**
-     * Create a new EconomyTestDataGenerator.
-     *
-     * @param dataStore the data store instance (MySQL or SQLite)
-     */
-    public EconomyTestDataGenerator(DataStore dataStore) {
-        super(
-            Logger.getLogger("TokenEconomy"),
-            () -> dataStore instanceof MySQLDataStore,
-            () -> {
-                try {
-                    if (dataStore instanceof MySQLDataStore) {
-                        // HikariCP pool: getDataSource().getConnection()
-                        Method getDataSourceMethod = dataStore.getClass().getMethod("getDataSource");
-                        Object ds = getDataSourceMethod.invoke(dataStore);
-                        return (Connection) ds.getClass().getMethod("getConnection").invoke(ds);
-                    } else {
-                        // SQLite: direct getConnection()
-                        Method getConnectionMethod = dataStore.getClass().getMethod("getConnection");
-                        return (Connection) getConnectionMethod.invoke(dataStore);
-                    }
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to get connection", e);
-                }
-            }
-        );
+    public EconomyTestDataGenerator(DataStore dataStore, Logger logger) {
         this.dataStore = dataStore;
+        this.logger = logger;
         this.executor = Executors.newSingleThreadExecutor();
         this.isMySQL = dataStore instanceof MySQLDataStore;
-
-        // Get table prefix via reflection (may not exist on all implementations)
-        String prefix = "";
-        try {
-            Method getPrefixMethod = dataStore.getClass().getDeclaredMethod("getTablePrefix");
-            getPrefixMethod.setAccessible(true);
-            prefix = (String) getPrefixMethod.invoke(dataStore);
-        } catch (Exception e) {
-            // Prefix method may not exist, use empty
-        }
-        this.tablePrefix = prefix != null ? prefix : "";
+        this.tablePrefix = dataStore.getTablePrefix();
     }
 
-    /**
-     * Get prefixed table name.
-     */
     private String table(String baseName) {
-        if (tablePrefix == null || tablePrefix.isEmpty()) {
-            return baseName;
-        }
-        return tablePrefix + baseName;
+        return (tablePrefix == null || tablePrefix.isEmpty()) ? baseName : tablePrefix + baseName;
     }
 
-    @Override
-    public String getGeneratorName() {
-        return "EconomyTestDataGenerator";
+    private UUID testUUID(int seed) {
+        return UUID.nameUUIDFromBytes(("test-player-" + seed).getBytes(StandardCharsets.UTF_8));
     }
 
-    @Override
+    private double randomDouble(double min, double max) {
+        return min + (random.nextDouble() * (max - min));
+    }
+
+    private void logInfo(String msg) { logger.info("[EconomyTestDataGenerator] " + msg); }
+    private void logSevere(String msg) { logger.severe("[EconomyTestDataGenerator] " + msg); }
+
+    public String getGeneratorName() { return "EconomyTestDataGenerator"; }
+
     public CompletableFuture<Integer> seed(DataCategory category) {
         return CompletableFuture.supplyAsync(() -> {
             logInfo("Seeding " + category.name() + " data...");
             int totalRecords = 0;
 
-            try {
-                Connection conn = getConnection();
+            try (Connection conn = dataStore.getConnection()) {
                 conn.setAutoCommit(false);
-
                 try {
-                    // Seed economy table (UUID, BALANCE)
                     totalRecords += seedEconomy(conn, category.getBaseCount());
-
                     conn.commit();
                     logInfo("Seed complete: " + totalRecords + " total records");
-
                 } catch (SQLException e) {
                     conn.rollback();
                     logSevere("Seed failed, rolling back: " + e.getMessage());
-                    throw e;
+                    return 0;
                 } finally {
                     conn.setAutoCommit(true);
                 }
-
-            } catch (SQLException e) {
-                logSevere("Failed to seed data: " + e.getMessage());
+            } catch (Exception e) {
+                logSevere("Seed connection failure [" + e.getClass().getName() + "]: " + e.getMessage());
                 return 0;
             }
 
@@ -131,83 +103,46 @@ public class EconomyTestDataGenerator extends TestDataGenerator {
         int inserted = 0;
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             for (int i = 0; i < count; i++) {
-                UUID playerUuid = testUUID(i);
-                double balance = generateBalance(i);
-
-                stmt.setString(1, playerUuid.toString());
-                stmt.setDouble(2, balance);
+                stmt.setString(1, testUUID(i).toString());
+                stmt.setDouble(2, generateBalance(i));
                 stmt.addBatch();
                 inserted++;
-
-                if (inserted % 100 == 0) {
-                    stmt.executeBatch();
-                }
+                if (inserted % 100 == 0) stmt.executeBatch();
             }
             stmt.executeBatch();
         }
-        logSeeded("economy", inserted);
+        logInfo("Generated " + inserted + " economy records");
+        seededCount = inserted;
         return inserted;
     }
 
-    /**
-     * Generate a realistic balance distribution.
-     * Most players have small balances, few have large ones.
-     */
     private double generateBalance(int seed) {
-        // Pareto-like distribution
-        if (seed % 100 == 0) {
-            // 1% wealthy
-            return 10000.0 + randomDouble(0, 90000);
-        } else if (seed % 20 == 0) {
-            // 5% well-off
-            return 1000.0 + randomDouble(0, 9000);
-        } else if (seed % 5 == 0) {
-            // 20% moderate
-            return 100.0 + randomDouble(0, 900);
-        } else {
-            // 74% modest
-            return randomDouble(0, 100);
-        }
+        if (seed % 100 == 0) return 10000.0 + randomDouble(0, 90000);
+        if (seed % 20 == 0)  return 1000.0  + randomDouble(0, 9000);
+        if (seed % 5 == 0)   return 100.0   + randomDouble(0, 900);
+        return randomDouble(0, 100);
     }
 
-    /**
-     * Seed the economy table. Kept for backward compatibility with SeedCommand.
-     * Delegates to the standard seed method.
-     */
-    public CompletableFuture<Integer> seedLegacyEconomy(DataCategory category) {
-        return seed(category);
-    }
-
-    @Override
     public CompletableFuture<Boolean> cleanup() {
         return CompletableFuture.supplyAsync(() -> {
             logInfo("Cleaning up all test data...");
+            int deleteCount = seededCount > 0 ? seededCount : 1000;
 
-            try {
-                Connection conn = getConnection();
+            try (Connection conn = dataStore.getConnection()) {
                 conn.setAutoCommit(false);
-
                 try {
-                    // Delete test records - test UUIDs are deterministic from testUUID()
-                    // We identify them by checking against known test UUID patterns
-                    // Since we use UUID.nameUUIDFromBytes("test-N"), we can rebuild them
-                    StringBuilder inClause = new StringBuilder();
-                    for (int i = 0; i < 1000; i++) {
-                        if (i > 0) inClause.append(",");
-                        inClause.append("'").append(testUUID(i).toString()).append("'");
-                    }
-
-                    String sql = "DELETE FROM " + table("economy") +
-                        " WHERE UUID IN (" + inClause + ")";
+                    String sql = "DELETE FROM " + table("economy") + " WHERE UUID = ?";
                     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                        int deleted = stmt.executeUpdate();
-                        logInfo("Deleted " + deleted + " records from economy");
+                        for (int i = 0; i < deleteCount; i++) {
+                            stmt.setString(1, testUUID(i).toString());
+                            stmt.addBatch();
+                            if (i > 0 && i % 100 == 0) stmt.executeBatch();
+                        }
+                        stmt.executeBatch();
                     }
-
                     conn.commit();
-                    logInfo("Cleanup complete");
+                    logInfo("Deleted up to " + deleteCount + " records from economy");
                     return true;
-
                 } catch (SQLException e) {
                     conn.rollback();
                     logSevere("Cleanup failed: " + e.getMessage());
@@ -215,35 +150,29 @@ public class EconomyTestDataGenerator extends TestDataGenerator {
                 } finally {
                     conn.setAutoCommit(true);
                 }
-
             } catch (SQLException e) {
-                logSevere("Failed to cleanup: " + e.getMessage());
+                logSevere("Failed to get connection for cleanup: " + e.getMessage());
                 return false;
             }
         }, executor);
     }
 
-    @Override
     public CompletableFuture<Integer> cleanupByPlayer(UUID playerUuid) {
         return CompletableFuture.supplyAsync(() -> {
             logInfo("Cleaning up data for player: " + playerUuid);
-            int totalDeleted = 0;
 
-            try {
-                Connection conn = getConnection();
+            try (Connection conn = dataStore.getConnection()) {
                 conn.setAutoCommit(false);
-
                 try {
-                    String sql = "DELETE FROM " + table("economy") +
-                        " WHERE UUID = ?";
-                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    int deleted;
+                    try (PreparedStatement stmt = conn.prepareStatement(
+                            "DELETE FROM " + table("economy") + " WHERE UUID = ?")) {
                         stmt.setString(1, playerUuid.toString());
-                        totalDeleted += stmt.executeUpdate();
+                        deleted = stmt.executeUpdate();
                     }
-
                     conn.commit();
-                    logInfo("Player cleanup complete: " + totalDeleted + " records");
-
+                    logInfo("Player cleanup complete: " + deleted + " records");
+                    return deleted;
                 } catch (SQLException e) {
                     conn.rollback();
                     logSevere("Player cleanup failed: " + e.getMessage());
@@ -251,22 +180,14 @@ public class EconomyTestDataGenerator extends TestDataGenerator {
                 } finally {
                     conn.setAutoCommit(true);
                 }
-
             } catch (SQLException e) {
-                logSevere("Failed to cleanup player data: " + e.getMessage());
+                logSevere("Failed to get connection for player cleanup: " + e.getMessage());
                 return 0;
             }
-
-            return totalDeleted;
         }, executor);
     }
 
-    /**
-     * Cleanup the executor when done.
-     */
     public void shutdown() {
-        if (executor != null && !executor.isShutdown()) {
-            executor.shutdown();
-        }
+        if (executor != null && !executor.isShutdown()) executor.shutdown();
     }
 }

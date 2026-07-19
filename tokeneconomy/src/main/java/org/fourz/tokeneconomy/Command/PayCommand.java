@@ -6,18 +6,18 @@ import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 
 public class PayCommand extends BaseCommand {
-    public PayCommand(TokenEconomy plugin) {
-        super(plugin);
+    public PayCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
+        super(plugin, playerResolver);
     }
 
     @Override
     protected boolean execute(CommandSender sender, String[] args) {
-        if (!(sender instanceof Player)) {
-            sendError(sender, "Only players can use the pay command.");
+        if (!checkPermission(sender, "pay")) {
             return true;
         }
 
-        if (!checkPermission(sender, "pay")) {
+        if (!(sender instanceof Player)) {
+            sendError(sender, "Only players can use the pay command.");
             return true;
         }
 
@@ -46,7 +46,7 @@ public class PayCommand extends BaseCommand {
         plugin.getEconomy().withdrawPlayer(player, amount);
         plugin.getEconomy().depositPlayer(target, amount);
 
-        String formattedAmount = CurrencyFormatter.format(amount, plugin);
+        String formattedAmount = CurrencyFormatter.format(amount, plugin.currencyNameSingular(), plugin.currencyNamePlural());
         sendSuccess(sender, "You sent " + formattedAmount + " to " + target.getName() + ".");
         sendSuccess(target, "You received " + formattedAmount + " from " + sender.getName() + ".");
 

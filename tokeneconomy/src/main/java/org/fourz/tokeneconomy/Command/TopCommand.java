@@ -13,24 +13,19 @@ import java.util.List;
 import java.util.Map;
 
 public class TopCommand extends BaseCommand implements CommandExecutor, TabCompleter {
-    // Constructor for initializing the command with plugin instance
-    public TopCommand(TokenEconomy plugin) {
-        super(plugin);
+    public TopCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
+        super(plugin, playerResolver);
     }
 
     @Override
     protected boolean execute(CommandSender sender, String[] args) {
-        // Check if user has permission to view top balances
-        if (!sender.hasPermission("tokeneconomy.top")) {
-            sender.sendMessage(ChatColor.RED + "You don't have permission to use this command.");
-            return true;
-        }
+        if (!checkPermission(sender, "top")) return true;
 
         // Retrieve and display top balances in formatted currency
         Map<String, Double> topBalances = plugin.getTopBalances();
         sender.sendMessage(ChatColor.GREEN + "Top Balances:");
         topBalances.forEach((playerName, balance) -> {
-            String formattedBalance = CurrencyFormatter.format(balance, plugin);
+            String formattedBalance = CurrencyFormatter.format(balance, plugin.currencyNameSingular(), plugin.currencyNamePlural());
             sender.sendMessage(ChatColor.GREEN + playerName + ": " + formattedBalance);
         });
 
