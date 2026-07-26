@@ -209,9 +209,16 @@ public class TokenEconomy extends JavaPlugin {
 
             String mode = configLoader.getDatabaseMode();
             String storage = configLoader.getStorageType();
-            String target = "mysql".equalsIgnoreCase(storage)
-                    ? configLoader.getMySQLHost() + "/" + configLoader.getMySQLDatabase()
-                    : "local file";
+            // In shared mode the storage.mysql.* fields are unused, so reporting them would print a
+            // misleading "localhost/null" instead of naming the pool actually in use.
+            String target;
+            if ("shared".equalsIgnoreCase(mode)) {
+                target = "RVNKCore shared pool";
+            } else if ("mysql".equalsIgnoreCase(storage)) {
+                target = configLoader.getMySQLHost() + "/" + configLoader.getMySQLDatabase();
+            } else {
+                target = "local file";
+            }
             getLogger().info("TokenEconomy reloaded — mode=" + mode + ", storage=" + storage
                     + ", target=" + target);
             return ReloadResult.ok(mode, storage, target);
