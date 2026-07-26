@@ -18,6 +18,7 @@ public class ConfigLoader {
     private String mysqlPassword;
     private String mysqlTablePrefix;
     private boolean mysqlUseSSL;
+    private int mysqlSocketTimeoutMs;
     private int mysqlConnectionTimeout;
     private int mysqlMaxRetries;
     private int mysqlRetryDelay;
@@ -63,6 +64,9 @@ public class ConfigLoader {
             mysqlPassword = config.getString("storage.mysql.password", "");
             mysqlTablePrefix = config.getString("storage.mysql.tablePrefix", "tokeneconomy_");
             mysqlUseSSL = config.getBoolean("storage.mysql.useSSL", false);
+            // Required for cross-host MySQL (#1799): bounds a read on a dropped WAN link so it fails
+            // instead of hanging the calling thread (the #1546 lesson from RVNKCore).
+            mysqlSocketTimeoutMs = normalizeToMs(config.getInt("storage.mysql.socketTimeout", 30000));
             mysqlConnectionTimeout = config.getInt("storage.mysql.connectionTimeout", 5000);
             mysqlMaxRetries = config.getInt("storage.mysql.maxRetries", 3);
             mysqlRetryDelay = config.getInt("storage.mysql.retryDelay", 2000);
@@ -126,6 +130,25 @@ public class ConfigLoader {
 
     public int getMySQLConnectionTimeout() {
         return mysqlConnectionTimeout;
+    }
+
+    /** Socket (read) timeout for the MySQL JDBC connection, in milliseconds (#1799). */
+    public int getMySQLSocketTimeoutMs() {
+        return mysqlSocketTimeoutMs;
+    }
+
+    /**
+     * Connect timeout in milliseconds. The legacy code multiplied {@code connectionTimeout} by 1000
+     * (treating it as seconds) while the shipped default of {@code 5000} plainly meant milliseconds —
+     * yielding a 5,000-second timeout. Values are normalised instead: anything ≥ 1000 is already ms.
+     */
+    public long getMySQLConnectTimeoutMs() {
+        return mysqlConnectionTimeout > 0 ? normalizeToMs(mysqlConnectionTimeout) : 10_000L;
+    }
+
+    /** Treats values under 1000 as seconds (legacy configs), everything else as milliseconds. */
+    private static int normalizeToMs(int value) {
+        return value > 0 && value < 1000 ? value * 1000 : value;
     }
 
     public int getMySQLMaxRetries() {

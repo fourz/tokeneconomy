@@ -33,21 +33,28 @@ public class StandalonePoolDelegate implements PoolDelegate {
         HikariConfig cfg = new HikariConfig();
 
         if ("mysql".equalsIgnoreCase(storageType)) {
+            // socketTimeout/connectTimeout/tcpKeepAlive are REQUIRED for cross-host MySQL (#1799):
+            // without socketTimeout a dropped WAN link hangs the calling thread indefinitely and leaks
+            // the connection — the exact #1546 failure RVNKCore already fixed
+            // (DatabaseConfig.withRequiredMySqlParams). The cluster economy points Dev/Event at
+            // nations' DB across the WAN, so this pool must carry the same hardening.
             cfg.setJdbcUrl("jdbc:mysql://" + configLoader.getMySQLHost() + ":" + configLoader.getMySQLPort()
                 + "/" + configLoader.getMySQLDatabase()
                 + "?useSSL=" + configLoader.getMySQLUseSSL()
                 + "&allowPublicKeyRetrieval=true"
                 + "&characterEncoding=UTF-8"
                 + "&serverTimezone=UTC"
-                + "&useUnicode=true");
+                + "&useUnicode=true"
+                + "&socketTimeout=" + configLoader.getMySQLSocketTimeoutMs()
+                + "&connectTimeout=" + configLoader.getMySQLConnectTimeoutMs()
+                + "&tcpKeepAlive=true");
             cfg.setUsername(configLoader.getMySQLUsername());
             cfg.setPassword(configLoader.getMySQLPassword());
             cfg.setMaximumPoolSize(10);
             cfg.setMinimumIdle(2);
             cfg.setIdleTimeout(300_000L);
             cfg.setMaxLifetime(580_000L);
-            cfg.setConnectionTimeout(configLoader.getMySQLConnectionTimeout() > 0
-                ? configLoader.getMySQLConnectionTimeout() * 1000L : 30_000L);
+            cfg.setConnectionTimeout(configLoader.getMySQLConnectTimeoutMs());
             cfg.addDataSourceProperty("cachePrepStmts", "true");
             cfg.addDataSourceProperty("prepStmtCacheSize", "250");
             cfg.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");

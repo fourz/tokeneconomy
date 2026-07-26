@@ -141,6 +141,90 @@ public class TokenEconomy extends JavaPlugin {
         return rsp != null ? rsp.getProvider() : null;
     }
 
+    /**
+     * Outcome of a {@link #reloadEconomy()} call — success plus the resulting topology, or the reason
+     * the reload was rejected. Reported by {@code /eco reload} so an operator can confirm what actually
+     * took effect rather than assuming.
+     */
+    public static final class ReloadResult {
+        private final boolean success;
+        private final String mode;
+        private final String storageType;
+        private final String target;
+        private final String error;
+
+        private ReloadResult(boolean success, String mode, String storageType, String target, String error) {
+            this.success = success;
+            this.mode = mode;
+            this.storageType = storageType;
+            this.target = target;
+            this.error = error;
+        }
+
+        static ReloadResult ok(String mode, String storageType, String target) {
+            return new ReloadResult(true, mode, storageType, target, null);
+        }
+
+        static ReloadResult failed(String error) {
+            return new ReloadResult(false, null, null, null, error);
+        }
+
+        public boolean isSuccess() { return success; }
+        public String getMode() { return mode; }
+        public String getStorageType() { return storageType; }
+        public String getTarget() { return target; }
+        public String getError() { return error; }
+    }
+
+    /**
+     * Re-reads config.yml and swaps in a rebuilt database layer without a restart (#1798).
+     *
+     * <p><b>Order is deliberate:</b> the replacement {@link DataConnector} is constructed and its schema
+     * verified <i>before</i> the incumbent is closed. A bad configuration therefore throws while the old
+     * connector is still serving, and we return a failure with the economy untouched. Closing first and
+     * rebuilding after would leave the server with no economy on any typo — unacceptable for the Vault
+     * provider that BarterShops and others transact through.</p>
+     *
+     * @return the resulting topology on success, or the reason for rejection
+     */
+    public synchronized ReloadResult reloadEconomy() {
+        DataConnector previous = this.dataConnector;
+        try {
+            configLoader.loadConfig();
+
+            DataConnector replacement = new DataConnector(this);
+            replacement.setupDatabase();
+
+            // Only now is the old layer safe to retire.
+            this.dataConnector = replacement;
+            if (previous != null) {
+                try {
+                    previous.saveDatabase();
+                    previous.closeDatabase();
+                } catch (Exception e) {
+                    getLogger().warning("Reload: failed to close the previous connection cleanly: "
+                            + e.getMessage());
+                }
+            }
+
+            String mode = configLoader.getDatabaseMode();
+            String storage = configLoader.getStorageType();
+            String target = "mysql".equalsIgnoreCase(storage)
+                    ? configLoader.getMySQLHost() + "/" + configLoader.getMySQLDatabase()
+                    : "local file";
+            getLogger().info("TokenEconomy reloaded — mode=" + mode + ", storage=" + storage
+                    + ", target=" + target);
+            return ReloadResult.ok(mode, storage, target);
+
+        } catch (Exception e) {
+            // Incumbent connector was never replaced, so the economy is still live.
+            this.dataConnector = previous;
+            getLogger().warning("TokenEconomy reload rejected, keeping previous configuration: "
+                    + e.getMessage());
+            return ReloadResult.failed(e.getMessage());
+        }
+    }
+
     public ConfigLoader getConfigLoader() {
         return configLoader;
     }
