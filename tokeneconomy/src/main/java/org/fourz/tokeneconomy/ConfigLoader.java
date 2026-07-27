@@ -192,4 +192,22 @@ public class ConfigLoader {
         plugin.saveConfig();
     }
 
+    /**
+     * Persists the active storage type <b>and</b> updates the cached value (#1807).
+     *
+     * <p>A migration changes which backend is live, so anything that writes {@code storage.type}
+     * must go through here. Writing straight to the config file left {@code storageType} holding the
+     * value read at load time, and {@code /eco debug} then reported the <i>pre-migration</i> backend
+     * — {@code Storage Type: sqlite} on a server that was fully and correctly on MySQL. Only the
+     * display was wrong, which is what made it dangerous: it is indistinguishable from a migration
+     * that genuinely failed, and that misreading is what produced #1795 in the first place.</p>
+     *
+     * @param type the storage type now in effect ("mysql" or "sqlite")
+     */
+    public void setStorageType(String type) {
+        storageType = type == null ? "sqlite" : type.toLowerCase();
+        plugin.getConfig().set("storage.type", storageType);
+        plugin.saveConfig();
+    }
+
 }

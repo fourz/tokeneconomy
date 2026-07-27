@@ -33,8 +33,7 @@ public class DataStoreMigrationService {
             if (migrationStatus.equals("completed")) {
                 logger.info("Migration from MySQL to SQLite already completed.");
                 plugin.getConfig().set("storage.migrate_from_mysql", false);
-                plugin.getConfig().set("storage.type", "sqlite");
-                plugin.saveConfig();
+                configLoader.setStorageType("sqlite");
                 return "sqlite";
             }
             String result = performMigration("mysql", "sqlite", "storage.migrate_from_mysql");
@@ -45,8 +44,7 @@ public class DataStoreMigrationService {
             if (migrationStatus.equals("completed")) {
                 logger.info("Migration from SQLite to MySQL already completed.");
                 plugin.getConfig().set("storage.migrate_from_sqlite", false);
-                plugin.getConfig().set("storage.type", "mysql");
-                plugin.saveConfig();
+                configLoader.setStorageType("mysql");
                 return "mysql";
             }
             String result = performMigration("sqlite", "mysql", "storage.migrate_from_sqlite");
@@ -81,8 +79,7 @@ public class DataStoreMigrationService {
             target.closeDatabase();
             configLoader.setMigrationStatus("completed");
             plugin.getConfig().set(clearFlag, false);
-            plugin.getConfig().set("storage.type", toType);
-            plugin.saveConfig();
+            configLoader.setStorageType(toType);
             logger.info("Migration from " + fromType + " to " + toType + " completed successfully.");
             return toType;
         } catch (Exception e) {
@@ -90,8 +87,7 @@ public class DataStoreMigrationService {
             e.printStackTrace();
             configLoader.setMigrationStatus("failed");
             logger.info("Falling back to SQLite storage.");
-            plugin.getConfig().set("storage.type", "sqlite");
-            plugin.saveConfig();
+            configLoader.setStorageType("sqlite");
             return null;
         }
     }
