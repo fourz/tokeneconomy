@@ -56,25 +56,36 @@ public class ConfigLoader {
             plugin.saveConfig();
         }
 
-        if (storageType.equals("mysql")) {
-            mysqlHost = config.getString("storage.mysql.host");
-            mysqlPort = config.getInt("storage.mysql.port", 3306);
-            mysqlDatabase = config.getString("storage.mysql.database");
-            mysqlUsername = config.getString("storage.mysql.username");
-            mysqlPassword = config.getString("storage.mysql.password", "");
-            mysqlTablePrefix = config.getString("storage.mysql.tablePrefix", "tokeneconomy_");
-            mysqlUseSSL = config.getBoolean("storage.mysql.useSSL", false);
-            // Required for cross-host MySQL (#1799): bounds a read on a dropped WAN link so it fails
-            // instead of hanging the calling thread (the #1546 lesson from RVNKCore).
-            mysqlSocketTimeoutMs = normalizeToMs(config.getInt("storage.mysql.socketTimeout", 30000));
-            mysqlConnectionTimeout = config.getInt("storage.mysql.connectionTimeout", 5000);
-            mysqlMaxRetries = config.getInt("storage.mysql.maxRetries", 3);
-            mysqlRetryDelay = config.getInt("storage.mysql.retryDelay", 2000);
-            
+        // Always read the MySQL block, even when storage.type is not "mysql" (#1804).
+        //
+        // Previously this was gated on storageType.equals("mysql"), which broke the SQLite→MySQL
+        // migration path: during a migrate_from_sqlite run, storage.type is still "sqlite" when the
+        // config is read, so every mysql.* field stayed null. The migration's MySQL target then
+        // resolved an EMPTY table prefix (AbstractDataStore null-guards it to "") and wrote all the
+        // balances into `economy` instead of `tokeneconomy_economy`. The migration reported success,
+        // flipped storage.type to mysql, and the next read — now correctly prefixed — found nothing.
+        // Same failure family as #1797: the migration silently strands the balances it claims to move.
+        mysqlHost = config.getString("storage.mysql.host");
+        mysqlPort = config.getInt("storage.mysql.port", 3306);
+        mysqlDatabase = config.getString("storage.mysql.database");
+        mysqlUsername = config.getString("storage.mysql.username");
+        mysqlPassword = config.getString("storage.mysql.password", "");
+        mysqlTablePrefix = config.getString("storage.mysql.tablePrefix", "tokeneconomy_");
+        mysqlUseSSL = config.getBoolean("storage.mysql.useSSL", false);
+        // Required for cross-host MySQL (#1799): bounds a read on a dropped WAN link so it fails
+        // instead of hanging the calling thread (the #1546 lesson from RVNKCore).
+        mysqlSocketTimeoutMs = normalizeToMs(config.getInt("storage.mysql.socketTimeout", 30000));
+        mysqlConnectionTimeout = config.getInt("storage.mysql.connectionTimeout", 5000);
+        mysqlMaxRetries = config.getInt("storage.mysql.maxRetries", 3);
+        mysqlRetryDelay = config.getInt("storage.mysql.retryDelay", 2000);
+
+        // Only announce the connection details when MySQL is actually going to be used — either as
+        // the live store, or as the target of a pending migration.
+        if (storageType.equals("mysql") || migrateFromSQLite) {
             // Log MySQL configuration (excluding sensitive data)
             plugin.getLogger().info(String.format(
-                "MySQL Configuration: host=%s, port=%d, database=%s, useSSL=%s",
-                mysqlHost, mysqlPort, mysqlDatabase, mysqlUseSSL));
+                "MySQL Configuration: host=%s, port=%d, database=%s, tablePrefix=%s, useSSL=%s",
+                mysqlHost, mysqlPort, mysqlDatabase, mysqlTablePrefix, mysqlUseSSL));
         }
     }
 
