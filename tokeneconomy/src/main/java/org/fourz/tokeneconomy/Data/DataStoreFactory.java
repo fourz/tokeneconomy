@@ -37,9 +37,18 @@ public class DataStoreFactory {
     }
 
     private PoolDelegate createPool(String storageType) {
+        // #1797: the pool must serve the REQUESTED storage type, not just the configured mode. The
+        // shared pool is RVNKCore's MySQL — it can never serve a "sqlite" request. Previously a
+        // sqlite request under database.mode=shared silently got the MySQL pool, so the
+        // sqlite->mysql migration (factory.create("sqlite") for the source) read the wrong backend
+        // and would have stranded every balance.
         String mode = configLoader.getDatabaseMode();
-        if ("shared".equalsIgnoreCase(mode)) {
+        if ("shared".equalsIgnoreCase(mode) && "mysql".equalsIgnoreCase(storageType)) {
             return new SharedPoolDelegate(plugin, plugin.getLogger());
+        }
+        if ("shared".equalsIgnoreCase(mode) && !"mysql".equalsIgnoreCase(storageType)) {
+            plugin.getLogger().info("database.mode=shared cannot serve storage type '" + storageType
+                + "' — using a standalone pool for it (expected during migration).");
         }
         return new StandalonePoolDelegate(configLoader, storageType, plugin.getDataFolder(), plugin.getLogger());
     }

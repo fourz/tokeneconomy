@@ -20,7 +20,7 @@ commands:
   economy:  
     description: Gives or sets an amount from the ether.
     aliases: [eco]
-    usage: /economy give|set|pay|top <player> [<amount>]
+    usage: /economy give|set|pay|top|reload <player> [<amount>]
   top:
     description: Display the top balances
     usage: /top
@@ -59,6 +59,9 @@ permissions:
     default: op
   tokeneconomy.debug:
     description: Access debug commands and diagnostics
+    default: op
+  tokeneconomy.reload:
+    description: Reload config and rebuild the database layer without a restart
     default: op
   tokeneconomy.admin.seed:
     description: Seed test data into the database

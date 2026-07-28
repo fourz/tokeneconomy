@@ -110,9 +110,15 @@ public class MySQLDataStore extends AbstractDataStore {
         Map<String, Double> topBalances = new LinkedHashMap<>();
         try (Connection conn = pool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
-                "SELECT e.UUID, e.BALANCE, p.name AS player_name" +
+                // RVNKCore's rvnk_players uses columns `id` (UUID PK) and `current_name` — the join
+                // previously used p.uuid / p.name, which do not exist, so every top-balances lookup
+                // failed with "Unknown column". It went unnoticed because the older config pointed at
+                // a database without rvnk_players at all, masking it as a missing-table error.
+                // NOTE: this join requires the economy tables and rvnk_players to live in the SAME
+                // database — a real constraint for the cluster economy (#1796).
+                "SELECT e.UUID, e.BALANCE, p.current_name AS player_name" +
                 " FROM " + table("economy") + " e" +
-                " LEFT JOIN rvnk_players p ON e.UUID = p.uuid" +
+                " LEFT JOIN rvnk_players p ON e.UUID = p.id" +
                 " ORDER BY e.BALANCE DESC LIMIT ?")) {
             stmt.setInt(1, limit);
             try (ResultSet rs = stmt.executeQuery()) {
