@@ -4,7 +4,7 @@
   <groupId>org.fourz</groupId>
   <artifactId>tokeneconomy</artifactId>
   <name>TokenEconomy</name>
-  <version>1.1.6</version>
+  <version>1.2.3</version>
   <description>A Minecraft economy plugin with Vault and GriefPrevention integration.</description>
   <url>https://your-repo-url-here</url>
   <build>
@@ -21,8 +21,7 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.13.0</version>
         <configuration>
-          <source>${java.version}</source>
-          <target>${java.version}</target>
+          <release>${java.version}</release>
         </configuration>
       </plugin>
       <plugin>
@@ -121,9 +120,8 @@
     </dependency>
   </dependencies>
   <properties>
-    <maven.compiler.target>${java.version}</maven.compiler.target>
-    <java.version>21</java.version>
-    <maven.compiler.source>${java.version}</maven.compiler.source>
+    <maven.compiler.release>${java.version}</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <java.version>21</java.version>
   </properties>
 </project>
