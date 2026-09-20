@@ -4,7 +4,7 @@
   <groupId>org.fourz</groupId>
   <artifactId>tokeneconomy</artifactId>
   <name>TokenEconomy</name>
-  <version>1.2.5</version>
+  <version>1.2.6</version>
   <description>A Minecraft economy plugin with Vault and GriefPrevention integration.</description>
   <url>https://your-repo-url-here</url>
   <build>
@@ -109,7 +109,7 @@
     <dependency>
       <groupId>org.fourz</groupId>
       <artifactId>rvnkcore</artifactId>
-      <version>1.5.88-alpha</version>
+      <version>1.5.89-alpha</version>
       <scope>provided</scope>
     </dependency>
     <dependency>

@@ -67,36 +67,51 @@ public class DataStoreFactory {
     }
 
     /**
-     * Returns why the MySQL economy host cannot be used, or {@code null} when it looks usable.
+     * Returns why the MySQL economy store cannot be used, or {@code null} when it looks usable.
      *
-     * <p>Prefers RVNKCore's shared reachability answer, which has usually already been paid for at
-     * this point in startup; falls back to its own short TCP probe so a standalone install is still
-     * covered. Either way this replaces HikariCP's 30-second retry window with a bounded check
-     * (#2103).</p>
+     * <p>Which host matters depends on the mode, and getting that wrong costs either a false alarm
+     * or a silent local ledger (#2103):</p>
+     * <ul>
+     *   <li><b>shared</b> - the pool comes from RVNKCore, so RVNKCore's own state is the answer.
+     *       This plugin's {@code storage.mysql.host} is usually unset here; probing it reported a
+     *       dead economy on a perfectly healthy server. If RVNKCore has fallen back to SQLite, the
+     *       economy must refuse rather than write balances into a local file.</li>
+     *   <li><b>standalone</b> - this plugin dials its own host, so that is what gets checked:
+     *       through RVNKCore's cache when it is the same host, otherwise by direct probe.</li>
+     * </ul>
+     *
+     * <p>Either way this replaces HikariCP's 30-second retry window with a bounded check.</p>
      */
     private String mysqlUnreachableReason() {
+        boolean shared = "shared".equalsIgnoreCase(configLoader.getDatabaseMode());
+        String host = configLoader.getMySQLHost();
         try {
             org.fourz.rvnkcore.RVNKCore core = org.fourz.rvnkcore.RVNKCore.getInstance();
             if (core != null && core.getServiceRegistry() != null) {
                 org.fourz.rvnkcore.api.service.DatabaseAvailabilityService availability =
                         core.getServiceRegistry().getService(
                                 org.fourz.rvnkcore.api.service.DatabaseAvailabilityService.class);
-                if (availability != null && !availability.isPrimaryReachable()) {
-                    return "database host is not answering (reported by RVNKCore)";
+                if (availability != null) {
+                    if (shared) {
+                        if (availability.isCoreInFallback()) {
+                            return "RVNKCore is serving from its local SQLite fallback";
+                        }
+                        if (!availability.isPrimaryReachable()) {
+                            return "database host is not answering (reported by RVNKCore)";
+                        }
+                        return null;
+                    }
+                    if (!availability.isReachable(host, configLoader.getMySQLPort())) {
+                        return "database host is not answering (reported by RVNKCore)";
+                    }
+                    return null;
                 }
             }
         } catch (Throwable ignored) {
             // No RVNKCore, or an older one without the service: fall through to the direct probe.
         }
-        if ("shared".equalsIgnoreCase(configLoader.getDatabaseMode())) {
-            // Shared mode borrows RVNKCore's pool, so this plugin's own storage.mysql.host is not
-            // the host that will be dialled - it is usually unset or a leftover "localhost".
-            // Probing it produced a false "economy unavailable" on a perfectly healthy server.
-            return null;
-        }
-        String host = configLoader.getMySQLHost();
-        if (host == null || host.isBlank()) {
-            return null;   // nothing to probe; let the pool report the real problem
+        if (shared || host == null || host.isBlank()) {
+            return null;   // nothing of our own to probe; let the pool report the real problem
         }
         try (java.net.Socket socket = new java.net.Socket()) {
             socket.connect(new java.net.InetSocketAddress(host, configLoader.getMySQLPort()), 3000);
