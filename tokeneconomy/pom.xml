@@ -5,7 +5,7 @@
     
     <groupId>org.fourz</groupId>
     <artifactId>tokeneconomy</artifactId>
-    <version>1.2.3</version>
+    <version>1.2.5</version>
     <packaging>jar</packaging>
     
     <name>TokenEconomy</name>
@@ -77,7 +77,7 @@
         <dependency>
             <groupId>org.fourz</groupId>
             <artifactId>rvnkcore</artifactId>
-            <version>1.5.6-alpha</version>
+            <version>1.5.88-alpha</version>
             <scope>provided</scope>
         </dependency>
 
@@ -95,6 +95,13 @@
             <scope>compile</scope>
         </dependency>
 
+        <!-- Tests: economy-offline behaviour when the database is unreachable (#2103) -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.2</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     
     <build>
