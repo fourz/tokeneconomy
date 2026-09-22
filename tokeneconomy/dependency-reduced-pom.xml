@@ -4,7 +4,7 @@
   <groupId>org.fourz</groupId>
   <artifactId>tokeneconomy</artifactId>
   <name>TokenEconomy</name>
-  <version>1.2.3</version>
+  <version>1.2.7</version>
   <description>A Minecraft economy plugin with Vault and GriefPrevention integration.</description>
   <url>https://your-repo-url-here</url>
   <build>
@@ -109,7 +109,7 @@
     <dependency>
       <groupId>org.fourz</groupId>
       <artifactId>rvnkcore</artifactId>
-      <version>1.5.6-alpha</version>
+      <version>1.5.89-alpha</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
@@ -117,6 +117,26 @@
       <artifactId>mysql-connector-java</artifactId>
       <version>8.0.33</version>
       <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.10.2</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>junit-jupiter-api</artifactId>
+          <groupId>org.junit.jupiter</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>junit-jupiter-params</artifactId>
+          <groupId>org.junit.jupiter</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>junit-jupiter-engine</artifactId>
+          <groupId>org.junit.jupiter</groupId>
+        </exclusion>
+      </exclusions>
     </dependency>
   </dependencies>
   <properties>
