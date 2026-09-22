@@ -84,6 +84,9 @@ public class TokenEconomyVaultAdapter implements Economy {
         if (hasAccount(player)) {
             return true; // already exists
         }
+        if (!plugin.getDataConnector().isEconomyWritable()) {
+            return false;   // no account was created; saying otherwise invents one (PR #6 review)
+        }
         plugin.getDataConnector().setPlayerBalance(player.getUniqueId(), 0.0);
         return true;
     }
@@ -149,6 +152,16 @@ public class TokenEconomyVaultAdapter implements Economy {
 
     // ─── Withdrawals ─────────────────────────────────────────────────────────
 
+    /**
+     * Failure text that tells the truth: an outage is not the same as being broke, and a consumer
+     * (or player) that cannot tell them apart retries forever or accuses the wrong thing.
+     */
+    private String unavailableReason(String normalReason) {
+        return plugin.getDataConnector().isEconomyWritable()
+                ? normalReason
+                : "Economy is temporarily unavailable - the database is unreachable";
+    }
+
     @Override
     public EconomyResponse withdrawPlayer(OfflinePlayer player, double amount) {
         EconomyResponse invalid = validateAmount(player, amount);
@@ -157,7 +170,10 @@ public class TokenEconomyVaultAdapter implements Economy {
         double balance = getBalance(player);
         return success
             ? new EconomyResponse(amount, balance, EconomyResponse.ResponseType.SUCCESS, null)
-            : new EconomyResponse(0, balance, EconomyResponse.ResponseType.FAILURE, "Insufficient balance");
+            // "Insufficient balance" was returned for every failure, so during an outage a player
+            // with plenty of Wizbucks was told they were broke (PR #6 review).
+            : new EconomyResponse(0, balance, EconomyResponse.ResponseType.FAILURE,
+                    unavailableReason("Insufficient balance"));
     }
 
     @Override
@@ -181,7 +197,14 @@ public class TokenEconomyVaultAdapter implements Economy {
     public EconomyResponse depositPlayer(OfflinePlayer player, double amount) {
         EconomyResponse invalid = validateAmount(player, amount);
         if (invalid != null) return invalid;
-        plugin.getDataConnector().changePlayerBalance(player.getUniqueId(), amount);
+        // The result was previously discarded and SUCCESS returned unconditionally. With the
+        // economy refusing writes during an outage that is fail-OPEN: a shop is told the payment
+        // landed and hands over goods for money that never moved (PR #6 review).
+        boolean deposited = plugin.getDataConnector().changePlayerBalance(player.getUniqueId(), amount);
+        if (!deposited) {
+            return new EconomyResponse(0, getBalance(player), EconomyResponse.ResponseType.FAILURE,
+                    unavailableReason("Deposit failed"));
+        }
         return new EconomyResponse(amount, getBalance(player), EconomyResponse.ResponseType.SUCCESS, null);
     }
 

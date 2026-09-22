@@ -67,4 +67,30 @@ class UnavailableDataStoreTest {
         assertEquals(1, warnings.get());
         assertEquals("host down", store.getReason());
     }
+
+    @Test
+    void storeReportsItselfUnavailableSoCallersCanRefuseHonestly() {
+        // TokenEconomyVaultAdapter.depositPlayer used to discard the write result and return
+        // SUCCESS regardless — fail-OPEN during an outage: a shop hands over goods for money that
+        // never moved. Callers now gate on this flag (PR #6 review).
+        AtomicInteger warnings = new AtomicInteger();
+        DataStore refusing = new UnavailableDataStore(countingLogger(warnings), "host down");
+        assertFalse(refusing.isStoreAvailable());
+
+        DataStore ordinary = new DataStore() {
+            public void setupDatabase() { }
+            public void saveDatabase() { }
+            public void closeDatabase() { }
+            public double getPlayerBalanceByUUID(UUID u) { return 0; }
+            public boolean changePlayerBalance(UUID u, double a) { return true; }
+            public void setPlayerBalance(UUID u, double b) { }
+            public java.util.Map<String, Double> getTopBalances(int l) { return java.util.Map.of(); }
+            public java.util.Map<String, Double> getAllPlayerBalances() { return java.util.Map.of(); }
+            public boolean isConnected() { return true; }
+            public boolean playerExistsByUUID(UUID u) { return true; }
+            public java.sql.Connection getConnection() { return null; }
+            public String getTablePrefix() { return ""; }
+        };
+        assertTrue(ordinary.isStoreAvailable(), "a working store must not be mistaken for a refusing one");
+    }
 }

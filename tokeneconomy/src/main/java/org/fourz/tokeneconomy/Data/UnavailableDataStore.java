@@ -33,28 +33,36 @@ public class UnavailableDataStore implements DataStore {
 
     private final Logger logger;
     private final String reason;
-    private long lastLogMs = 0L;
+    /** CAS-guarded: Vault callers arrive concurrently, and a plain check-then-set lets several
+     *  threads through the same window and defeats the once-per-interval bound (PR #6 review). */
+    private final java.util.concurrent.atomic.AtomicLong lastLogMs = new java.util.concurrent.atomic.AtomicLong(0L);
 
     public UnavailableDataStore(Logger logger, String reason) {
         this.logger = logger;
         this.reason = reason;
     }
 
+    @Override
+    public boolean isStoreAvailable() {
+        return false;
+    }
+
     private void refuse(String operation) {
         long now = System.currentTimeMillis();
-        if (now - lastLogMs >= LOG_INTERVAL_MS) {
-            lastLogMs = now;
+        long previous = lastLogMs.get();
+        if (now - previous >= LOG_INTERVAL_MS && lastLogMs.compareAndSet(previous, now)) {
             logger.warning("Economy is unavailable (" + reason + ") - refused: " + operation
                     + ". Balances are network-shared, so no local ledger is kept."
-                    + " Restore the database and restart to resume.");
+                    + " This store does NOT self-heal: after the database returns, run /eco reload"
+                    + " or restart the server to rebuild the connector.");
         }
     }
 
     @Override
     public void setupDatabase() {
         logger.warning("Economy database unavailable (" + reason + ") - TokenEconomy stays enabled but"
-                + " every balance read and transaction is refused until the database returns."
-                + " No local balances are written.");
+                + " every balance read and transaction is refused. No local balances are written."
+                + " Recovery is NOT automatic: run /eco reload or restart once the database is back.");
     }
 
     @Override

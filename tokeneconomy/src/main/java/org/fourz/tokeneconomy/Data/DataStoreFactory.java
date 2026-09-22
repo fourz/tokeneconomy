@@ -32,7 +32,10 @@ public class DataStoreFactory {
         PoolDelegate pool = createPool(storageType);
         try {
             pool.initialize();
-        } catch (SQLException e) {
+        } catch (Exception e) {
+            // Not just SQLException: SharedPoolDelegate reports a missing or unhealthy RVNKCore with
+            // IllegalStateException, and catching only SQLException let that abort the enable - the
+            // exact failure this fallback exists to prevent (PR #6 review).
             if ("mysql".equalsIgnoreCase(storageType)) {
                 return new UnavailableDataStore(plugin.getLogger(),
                         "connection pool failed: " + e.getMessage());

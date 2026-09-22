@@ -25,7 +25,23 @@ public class DataConnector {
     }
 
     public void setupDatabase() {
-        dataStore.setupDatabase();
+        try {
+            dataStore.setupDatabase();
+        } catch (RuntimeException e) {
+            // The reachability pre-flight is a point-in-time check: the host can answer the probe and
+            // still be gone by the time the schema runs. Without this, that window threw out of
+            // onEnable with the Vault provider already registered against a half-built store
+            // (PR #6 review). Swap to the refusing store instead.
+            logger.severe("Economy database setup failed (" + e.getMessage()
+                    + ") - switching to the unavailable store; transactions will be refused.");
+            dataStore = new UnavailableDataStore(logger, "setup failed: " + e.getMessage());
+            dataStore.setupDatabase();
+        }
+    }
+
+    /** False while the economy is refusing writes - see {@link DataStore#isStoreAvailable()}. */
+    public boolean isEconomyWritable() {
+        return dataStore.isStoreAvailable();
     }
 
     public void saveDatabase() {
