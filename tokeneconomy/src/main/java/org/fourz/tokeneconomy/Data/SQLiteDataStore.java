@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.Plugin;
 import org.fourz.tokeneconomy.Data.connection.PoolDelegate;
 
@@ -91,35 +90,28 @@ public class SQLiteDataStore extends AbstractDataStore {
         }
     }
 
-    public Map<String, Double> getTopBalances(int limit) {
-        Map<String, Double> topBalances = new LinkedHashMap<>();
+    @Override
+    public java.util.List<BalanceEntry> getTopBalanceEntries(int limit) {
+        java.util.List<BalanceEntry> entries = new java.util.ArrayList<>();
         try (Connection conn = pool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT UUID, BALANCE FROM " + ECONOMY_TABLE + " ORDER BY BALANCE DESC LIMIT ?")) {
             stmt.setInt(1, limit);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    String uuidStr = rs.getString("UUID");
-                    double balance = rs.getDouble("BALANCE");
-                    String displayName = resolvePlayerName(uuidStr);
-                    topBalances.put(displayName, balance);
+                    try {
+                        // A local file has no roster to join: the name is resolved for display
+                        entries.add(new BalanceEntry(UUID.fromString(rs.getString("UUID")), null,
+                                rs.getDouble("BALANCE")));
+                    } catch (IllegalArgumentException | NullPointerException ignored) {
+                        // a malformed key is not a player
+                    }
                 }
             }
         } catch (SQLException e) {
             logger.warning("Failed to retrieve top balances: " + e.getMessage());
         }
-        return topBalances;
-    }
-
-    private String resolvePlayerName(String uuidStr) {
-        try {
-            UUID uuid = UUID.fromString(uuidStr);
-            OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
-            String name = offlinePlayer.getName();
-            return name != null ? name : uuidStr;
-        } catch (Exception e) {
-            return uuidStr;
-        }
+        return entries;
     }
 
     public Map<String, Double> getAllPlayerBalances() {

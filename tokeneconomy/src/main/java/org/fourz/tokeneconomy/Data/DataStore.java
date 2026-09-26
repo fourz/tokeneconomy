@@ -21,7 +21,8 @@ public interface DataStore {
     double getPlayerBalanceByUUID(UUID playerUUID);
     boolean changePlayerBalance(UUID playerUUID, double amount);
     void setPlayerBalance(UUID playerUUID, double balance);
-    Map<String, Double> getTopBalances(int limit);
+    /** Highest balances, descending. Names are nullable - see {@link BalanceEntry}. */
+    java.util.List<BalanceEntry> getTopBalanceEntries(int limit);
     Map<String, Double> getAllPlayerBalances();
     boolean isConnected() throws SQLException;
     boolean playerExistsByUUID(UUID uuid);

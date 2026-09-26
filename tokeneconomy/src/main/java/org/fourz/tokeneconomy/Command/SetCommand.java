@@ -26,7 +26,7 @@ public class SetCommand extends BaseCommand {
         UUID targetUUID = resolvePlayerUUID(sender, args[0]);
         if (targetUUID == null) return true;
 
-        Double amount = parseAmount(sender, args[1]);
+        Double amount = parseAmount(sender, args[1], true);
         if (amount == null) return true;
 
         plugin.getDataConnector().setPlayerBalance(targetUUID, amount);

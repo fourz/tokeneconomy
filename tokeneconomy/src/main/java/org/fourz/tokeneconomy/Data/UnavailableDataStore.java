@@ -93,9 +93,9 @@ public class UnavailableDataStore implements DataStore {
     }
 
     @Override
-    public Map<String, Double> getTopBalances(int limit) {
+    public java.util.List<BalanceEntry> getTopBalanceEntries(int limit) {
         refuse("top balances");
-        return Collections.emptyMap();
+        return Collections.emptyList();
     }
 
     @Override

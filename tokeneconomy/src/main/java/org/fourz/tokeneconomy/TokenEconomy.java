@@ -57,6 +57,7 @@ public class TokenEconomy extends JavaPlugin {
             registerGriefProtectionHook();
 
             TokenEconomyAPI.init(this);
+            registerEconomyService();
 
             getLogger().info("TokenEconomy successfully enabled!");
         } catch (Exception e) {
@@ -73,6 +74,8 @@ public class TokenEconomy extends JavaPlugin {
     public void onDisable() {
         try {
             getLogger().info("Disabling TokenEconomy...");
+            // Before the pool closes, so no consumer can call into a closed connector
+            unregisterEconomyService();
             if (dataConnector != null) {
                 // Save and close database
                 dataConnector.saveDatabase();
@@ -101,6 +104,34 @@ public class TokenEconomy extends JavaPlugin {
         getServer().getServicesManager().register(Economy.class, new TokenEconomyVaultAdapter(this), this, ServicePriority.Normal);
         getLogger().info("TokenEconomy registered as a Vault economy provider.");
         return true;
+    }
+
+    /**
+     * Provides RVNKCore's IEconomyService (#2108). RVNKCore is a soft dependency: its classes are
+     * reached only through RvnkCoreServiceBridge, behind the enabled check and a Throwable guard, so a
+     * missing or older RVNKCore costs the service and nothing else.
+     */
+    private void registerEconomyService() {
+        if (!getServer().getPluginManager().isPluginEnabled("RVNKCore")) {
+            getLogger().info("RVNKCore not enabled - IEconomyService not registered.");
+            return;
+        }
+        try {
+            if (org.fourz.tokeneconomy.Service.RvnkCoreServiceBridge.register(this)) {
+                getLogger().info("Registered IEconomyService with RVNKCore.");
+            }
+        } catch (Throwable t) {
+            getLogger().warning("Could not register IEconomyService with RVNKCore ("
+                    + t.getClass().getSimpleName() + ": " + t.getMessage() + ") - Vault is unaffected.");
+        }
+    }
+
+    private void unregisterEconomyService() {
+        try {
+            org.fourz.tokeneconomy.Service.RvnkCoreServiceBridge.unregister();
+        } catch (Throwable ignored) {
+            // RVNKCore classes absent: nothing was registered
+        }
     }
 
     private void registerCommands() {
