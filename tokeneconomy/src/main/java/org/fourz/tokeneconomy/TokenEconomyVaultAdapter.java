@@ -81,14 +81,13 @@ public class TokenEconomyVaultAdapter implements Economy {
 
     @Override
     public boolean createPlayerAccount(OfflinePlayer player) {
-        if (hasAccount(player)) {
-            return true; // already exists
-        }
         if (!plugin.getDataConnector().isEconomyWritable()) {
             return false;   // no account was created; saying otherwise invents one (PR #6 review)
         }
-        plugin.getDataConnector().setPlayerBalance(player.getUniqueId(), 0.0);
-        return true;
+        // Insert-only. This was hasAccount() then setPlayerBalance(0): hasAccount answers false on
+        // any SQL error, and setPlayerBalance is an upsert, so a transient error zeroed a real
+        // balance (#2124). One statement answers "exists or created" without overwriting.
+        return plugin.getDataConnector().createAccountIfAbsent(player.getUniqueId(), 0.0);
     }
 
     @Override
@@ -243,6 +242,10 @@ public class TokenEconomyVaultAdapter implements Economy {
     }
 
     private EconomyResponse validateAmount(OfflinePlayer player, double amount) {
+        // NaN fails every comparison, so "amount < 0" let it through into the balance arithmetic
+        if (!Double.isFinite(amount)) {
+            return new EconomyResponse(0, getBalance(player), EconomyResponse.ResponseType.FAILURE, "Amount must be a finite number");
+        }
         if (amount < 0) {
             return new EconomyResponse(0, getBalance(player), EconomyResponse.ResponseType.FAILURE, "Amount must be positive");
         }

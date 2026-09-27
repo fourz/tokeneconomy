@@ -48,6 +48,14 @@ class UnavailableDataStoreTest {
     }
 
     @Test
+    void accountCreationIsRefused() {
+        // "true" here would tell a Vault consumer an account exists that was never written (#2124)
+        AtomicInteger warnings = new AtomicInteger();
+        UnavailableDataStore store = new UnavailableDataStore(countingLogger(warnings), "host down");
+        assertFalse(store.createAccountIfAbsent(UUID.randomUUID(), 0.0));
+    }
+
+    @Test
     void refusalsAreRateLimitedSoAnOutageCannotFloodTheLog() {
         AtomicInteger warnings = new AtomicInteger();
         UnavailableDataStore store = new UnavailableDataStore(countingLogger(warnings), "host down");
@@ -84,6 +92,7 @@ class UnavailableDataStoreTest {
             public double getPlayerBalanceByUUID(UUID u) { return 0; }
             public boolean changePlayerBalance(UUID u, double a) { return true; }
             public void setPlayerBalance(UUID u, double b) { }
+            public boolean createAccountIfAbsent(UUID u, double b) { return true; }
             public java.util.List<BalanceEntry> getTopBalanceEntries(int l) { return java.util.List.of(); }
             public java.util.Map<String, Double> getAllPlayerBalances() { return java.util.Map.of(); }
             public boolean isConnected() { return true; }

@@ -93,6 +93,12 @@ public class UnavailableDataStore implements DataStore {
     }
 
     @Override
+    public boolean createAccountIfAbsent(UUID uuid, double initialBalance) {
+        refuse("account creation");
+        return false;
+    }
+
+    @Override
     public java.util.List<BalanceEntry> getTopBalanceEntries(int limit) {
         refuse("top balances");
         return Collections.emptyList();

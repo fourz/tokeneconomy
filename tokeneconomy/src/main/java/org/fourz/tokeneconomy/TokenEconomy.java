@@ -20,6 +20,7 @@ import java.util.logging.Level;
 public class TokenEconomy extends JavaPlugin {
     private ConfigLoader configLoader;
     private DataConnector dataConnector;
+    private TokenEconomyVaultAdapter vaultAdapter;
 
     @Override
     public void onEnable() {
@@ -101,7 +102,8 @@ public class TokenEconomy extends JavaPlugin {
         if (vault == null || !vault.isEnabled()) {
             return false;
         }
-        getServer().getServicesManager().register(Economy.class, new TokenEconomyVaultAdapter(this), this, ServicePriority.Normal);
+        vaultAdapter = new TokenEconomyVaultAdapter(this);
+        getServer().getServicesManager().register(Economy.class, vaultAdapter, this, ServicePriority.Normal);
         getLogger().info("TokenEconomy registered as a Vault economy provider.");
         return true;
     }
@@ -173,6 +175,14 @@ public class TokenEconomy extends JavaPlugin {
     }
 
     /**
+     * This plugin's own Vault provider. {@link #getEconomy()} returns whichever provider Vault ranks
+     * highest, which need not be TokenEconomy - our own commands must move Wizbucks, not that (#2124).
+     */
+    public Economy getVaultAdapter() {
+        return vaultAdapter;
+    }
+
+    /**
      * Outcome of a {@link #reloadEconomy()} call — success plus the resulting topology, or the reason
      * the reload was rejected. Reported by {@code /eco reload} so an operator can confirm what actually
      * took effect rather than assuming.
@@ -225,6 +235,24 @@ public class TokenEconomy extends JavaPlugin {
 
             DataConnector replacement = new DataConnector(this);
             replacement.setupDatabase();
+
+            // An unreachable database does not throw: the factory and setupDatabase() hand back the
+            // refusing store instead. Installing it would close a working pool and report success
+            // for an economy that now refuses everything (#2124).
+            if (!replacement.isEconomyWritable()) {
+                String reason = replacement.getDataStore() instanceof org.fourz.tokeneconomy.Data.UnavailableDataStore u
+                        ? u.getReason() : "economy database unavailable";
+                try {
+                    replacement.closeDatabase();
+                } catch (Exception closeError) {
+                    getLogger().warning("Reload: failed to close the rejected connection: "
+                            + closeError.getMessage());
+                }
+                getLogger().warning("TokenEconomy reload rejected, keeping previous configuration: "
+                        + reason);
+                return ReloadResult.failed("new configuration cannot reach the economy database ("
+                        + reason + ")");
+            }
 
             // Only now is the old layer safe to retire.
             this.dataConnector = replacement;

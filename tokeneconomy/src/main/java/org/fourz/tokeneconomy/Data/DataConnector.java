@@ -64,6 +64,11 @@ public class DataConnector {
         dataStore.setPlayerBalance(uuid, balance);
     }
 
+    /** Insert-only account creation - see {@link DataStore#createAccountIfAbsent}. */
+    public boolean createAccountIfAbsent(UUID uuid, double initialBalance) {
+        return dataStore.createAccountIfAbsent(uuid, initialBalance);
+    }
+
     public boolean playerExistsByUUID(UUID uuid) {
         return dataStore.playerExistsByUUID(uuid);
     }

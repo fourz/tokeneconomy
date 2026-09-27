@@ -102,27 +102,50 @@ public class DataStoreMigrationService {
             throw new SQLException("Failed to initialize target database - check connection parameters and permissions");
         }
 
-        Map<String, Double> balances = source.getAllPlayerBalances();
+        copyMissingBalances(source.getAllPlayerBalances(), target);
+    }
+
+    /**
+     * Fills only the rows the target lacks and never overwrites one. This used setPlayerBalance, an
+     * upsert: the target is the shared table another server is writing, and a re-run replaced live
+     * balances with the source's stale copy (#2124).
+     *
+     * @return {inserted, skipped (already present), failed}
+     */
+    int[] copyMissingBalances(Map<String, Double> balances, DataStore target) {
         int totalPlayers = balances.size();
-        int migratedPlayers = 0;
+        int inserted = 0;
+        int skipped = 0;
+        int failed = 0;
         logger.info("Starting data migration for " + totalPlayers + " players.");
 
         for (Map.Entry<String, Double> entry : balances.entrySet()) {
             try {
-                target.setPlayerBalance(UUID.fromString(entry.getKey()), entry.getValue());
-                migratedPlayers++;
-                if (migratedPlayers % 100 == 0) {
-                    logger.info("Migrated " + migratedPlayers + "/" + totalPlayers + " player balances.");
+                UUID uuid = UUID.fromString(entry.getKey());
+                if (target.playerExistsByUUID(uuid)) {
+                    skipped++;
+                } else if (target.createAccountIfAbsent(uuid, entry.getValue())) {
+                    inserted++;
+                } else {
+                    failed++;
+                    logger.warning("Failed to migrate player " + entry.getKey());
                 }
             } catch (Exception e) {
+                failed++;
                 logger.warning("Failed to migrate player " + entry.getKey() + ": " + e.getMessage());
             }
+            int processed = inserted + skipped + failed;
+            if (processed % 100 == 0) {
+                logger.info("Processed " + processed + "/" + totalPlayers + " player balances.");
+            }
         }
-        logger.info("Data migration completed. Successfully migrated: " + migratedPlayers + "/" + totalPlayers);
+        logger.info("Data migration completed. Inserted: " + inserted + ", skipped (already present,"
+                + " left untouched): " + skipped + ", failed: " + failed + ", total: " + totalPlayers);
 
-        if (migratedPlayers < totalPlayers) {
+        if (failed > 0) {
             logger.warning("Some player data failed to migrate. Check logs for details.");
         }
+        return new int[] {inserted, skipped, failed};
     }
 
     private boolean initializeStore(DataStore store) {
