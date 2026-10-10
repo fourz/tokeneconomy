@@ -64,12 +64,41 @@ public class DataConnector {
         dataStore.setPlayerBalance(uuid, balance);
     }
 
+    /** Insert-only account creation - see {@link DataStore#createAccountIfAbsent}. */
+    public boolean createAccountIfAbsent(UUID uuid, double initialBalance) {
+        return dataStore.createAccountIfAbsent(uuid, initialBalance);
+    }
+
     public boolean playerExistsByUUID(UUID uuid) {
         return dataStore.playerExistsByUUID(uuid);
     }
 
+    public java.util.List<BalanceEntry> getTopBalanceEntries(int limit) {
+        return dataStore.getTopBalanceEntries(limit);
+    }
+
+    /**
+     * Leaderboard for display, keyed by a readable name. A player with no roster name falls back to
+     * this server's own player cache, then to "Unknown (7f2123f3)" - never a bare 36-character UUID,
+     * which read as data corruption on tiers that had never seen the player (#1806).
+     */
     public Map<String, Double> getTopBalances(int limit) {
-        return dataStore.getTopBalances(limit);
+        Map<String, Double> display = new java.util.LinkedHashMap<>();
+        for (BalanceEntry entry : getTopBalanceEntries(limit)) {
+            display.put(displayName(entry), entry.balance());
+        }
+        return display;
+    }
+
+    static String displayName(BalanceEntry entry) {
+        if (entry.name() != null) return entry.name();
+        try {
+            String cached = org.bukkit.Bukkit.getOfflinePlayer(entry.uuid()).getName();
+            if (cached != null && !cached.isEmpty()) return cached;
+        } catch (Exception ignored) {
+            // no server (tests) or no cache entry
+        }
+        return "Unknown (" + entry.uuid().toString().substring(0, 8) + ")";
     }
 
     public Map<String, Double> getAllPlayerBalances() {

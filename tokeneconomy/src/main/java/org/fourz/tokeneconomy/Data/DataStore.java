@@ -21,7 +21,16 @@ public interface DataStore {
     double getPlayerBalanceByUUID(UUID playerUUID);
     boolean changePlayerBalance(UUID playerUUID, double amount);
     void setPlayerBalance(UUID playerUUID, double balance);
-    Map<String, Double> getTopBalances(int limit);
+    /**
+     * Inserts a row only when none exists - never overwrites a balance (#2124). True when the row
+     * now exists (inserted, or already present), false on error or refusal.
+     *
+     * <p>Use this, not {@link #setPlayerBalance}, to create an account: that is an upsert, and an
+     * existence check that failed on a transient error then zeroed a real balance.</p>
+     */
+    boolean createAccountIfAbsent(UUID uuid, double initialBalance);
+    /** Highest balances, descending. Names are nullable - see {@link BalanceEntry}. */
+    java.util.List<BalanceEntry> getTopBalanceEntries(int limit);
     Map<String, Double> getAllPlayerBalances();
     boolean isConnected() throws SQLException;
     boolean playerExistsByUUID(UUID uuid);

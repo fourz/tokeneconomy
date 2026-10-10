@@ -41,10 +41,18 @@ class UnavailableDataStoreTest {
         assertFalse(store.changePlayerBalance(player, -500.0), "must not debit an unreachable ledger");
         assertFalse(store.playerExistsByUUID(player));
         assertEquals(0.0D, store.getPlayerBalanceByUUID(player));
-        assertTrue(store.getTopBalances(10).isEmpty());
+        assertTrue(store.getTopBalanceEntries(10).isEmpty());
         assertTrue(store.getAllPlayerBalances().isEmpty());
         assertFalse(store.isConnected());
         assertThrows(SQLException.class, store::getConnection);
+    }
+
+    @Test
+    void accountCreationIsRefused() {
+        // "true" here would tell a Vault consumer an account exists that was never written (#2124)
+        AtomicInteger warnings = new AtomicInteger();
+        UnavailableDataStore store = new UnavailableDataStore(countingLogger(warnings), "host down");
+        assertFalse(store.createAccountIfAbsent(UUID.randomUUID(), 0.0));
     }
 
     @Test
@@ -84,7 +92,8 @@ class UnavailableDataStoreTest {
             public double getPlayerBalanceByUUID(UUID u) { return 0; }
             public boolean changePlayerBalance(UUID u, double a) { return true; }
             public void setPlayerBalance(UUID u, double b) { }
-            public java.util.Map<String, Double> getTopBalances(int l) { return java.util.Map.of(); }
+            public boolean createAccountIfAbsent(UUID u, double b) { return true; }
+            public java.util.List<BalanceEntry> getTopBalanceEntries(int l) { return java.util.List.of(); }
             public java.util.Map<String, Double> getAllPlayerBalances() { return java.util.Map.of(); }
             public boolean isConnected() { return true; }
             public boolean playerExistsByUUID(UUID u) { return true; }

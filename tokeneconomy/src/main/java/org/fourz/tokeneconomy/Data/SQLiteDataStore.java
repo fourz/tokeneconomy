@@ -6,7 +6,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.Plugin;
 import org.fourz.tokeneconomy.Data.connection.PoolDelegate;
 
@@ -46,15 +45,20 @@ public class SQLiteDataStore extends AbstractDataStore {
     @Override
     protected Logger getLogger() { return logger; }
 
+    /** Adds {@code amount} unless that would take the balance below zero. True when a row changed. */
+    private boolean guardedUpdate(Connection conn, UUID playerUUID, double amount) throws SQLException {
+        try (PreparedStatement update = conn.prepareStatement(
+                "UPDATE " + ECONOMY_TABLE + " SET BALANCE = BALANCE + ? WHERE UUID = ? AND BALANCE + ? >= 0")) {
+            update.setDouble(1, amount);
+            update.setString(2, playerUUID.toString());
+            update.setDouble(3, amount);
+            return update.executeUpdate() > 0;
+        }
+    }
+
     public boolean changePlayerBalance(UUID playerUUID, double amount) {
         try (Connection conn = pool.getConnection()) {
-            try (PreparedStatement update = conn.prepareStatement(
-                    "UPDATE " + ECONOMY_TABLE + " SET BALANCE = BALANCE + ? WHERE UUID = ? AND BALANCE + ? >= 0")) {
-                update.setDouble(1, amount);
-                update.setString(2, playerUUID.toString());
-                update.setDouble(3, amount);
-                if (update.executeUpdate() > 0) return true;
-            }
+            if (guardedUpdate(conn, playerUUID, amount)) return true;
             try (PreparedStatement check = conn.prepareStatement(
                     "SELECT 1 FROM " + ECONOMY_TABLE + " WHERE UUID = ?")) {
                 check.setString(1, playerUUID.toString());
@@ -67,11 +71,28 @@ public class SQLiteDataStore extends AbstractDataStore {
                     "INSERT OR IGNORE INTO " + ECONOMY_TABLE + " (UUID, BALANCE) VALUES (?, ?)")) {
                 insert.setString(1, playerUUID.toString());
                 insert.setDouble(2, amount);
-                insert.executeUpdate();
-                return true;
+                if (insert.executeUpdate() > 0) return true;
             }
+            // Zero rows: a concurrent writer created the row first and the amount was silently
+            // dropped (#2124). Apply it to the row that now exists.
+            return guardedUpdate(conn, playerUUID, amount);
         } catch (SQLException e) {
             logger.warning("Failed to change player balance: " + e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
+    public boolean createAccountIfAbsent(UUID uuid, double initialBalance) {
+        try (Connection conn = pool.getConnection();
+             PreparedStatement insert = conn.prepareStatement(
+                "INSERT OR IGNORE INTO " + ECONOMY_TABLE + " (UUID, BALANCE) VALUES (?, ?)")) {
+            insert.setString(1, uuid.toString());
+            insert.setDouble(2, initialBalance);
+            insert.executeUpdate();
+            return true; // inserted, or the primary key already held a row
+        } catch (SQLException e) {
+            logger.warning("Failed to create account " + uuid + ": " + e.getMessage());
             return false;
         }
     }
@@ -91,35 +112,28 @@ public class SQLiteDataStore extends AbstractDataStore {
         }
     }
 
-    public Map<String, Double> getTopBalances(int limit) {
-        Map<String, Double> topBalances = new LinkedHashMap<>();
+    @Override
+    public java.util.List<BalanceEntry> getTopBalanceEntries(int limit) {
+        java.util.List<BalanceEntry> entries = new java.util.ArrayList<>();
         try (Connection conn = pool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(
                 "SELECT UUID, BALANCE FROM " + ECONOMY_TABLE + " ORDER BY BALANCE DESC LIMIT ?")) {
             stmt.setInt(1, limit);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    String uuidStr = rs.getString("UUID");
-                    double balance = rs.getDouble("BALANCE");
-                    String displayName = resolvePlayerName(uuidStr);
-                    topBalances.put(displayName, balance);
+                    try {
+                        // A local file has no roster to join: the name is resolved for display
+                        entries.add(new BalanceEntry(UUID.fromString(rs.getString("UUID")), null,
+                                rs.getDouble("BALANCE")));
+                    } catch (IllegalArgumentException | NullPointerException ignored) {
+                        // a malformed key is not a player
+                    }
                 }
             }
         } catch (SQLException e) {
             logger.warning("Failed to retrieve top balances: " + e.getMessage());
         }
-        return topBalances;
-    }
-
-    private String resolvePlayerName(String uuidStr) {
-        try {
-            UUID uuid = UUID.fromString(uuidStr);
-            OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
-            String name = offlinePlayer.getName();
-            return name != null ? name : uuidStr;
-        } catch (Exception e) {
-            return uuidStr;
-        }
+        return entries;
     }
 
     public Map<String, Double> getAllPlayerBalances() {

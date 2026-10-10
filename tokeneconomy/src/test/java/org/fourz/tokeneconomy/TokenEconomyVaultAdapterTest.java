@@ -15,6 +15,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -91,6 +92,41 @@ class TokenEconomyVaultAdapterTest {
         assertFalse(adapter.createPlayerAccount(player),
                 "reporting an account that was never written makes callers skip creating it later");
         verify(connector, never()).setPlayerBalance(any(UUID.class), anyDouble());
+        verify(connector, never()).createAccountIfAbsent(any(UUID.class), anyDouble());
+    }
+
+    @Test
+    void accountCreationIsInsertOnlyAndNeverOverwrites() {
+        // hasAccount() answered false on any SQL error, then setPlayerBalance(0) - an upsert -
+        // zeroed the real balance (#2124)
+        when(connector.isEconomyWritable()).thenReturn(true);
+        when(connector.playerExistsByUUID(any(UUID.class))).thenReturn(false);
+        when(connector.createAccountIfAbsent(any(UUID.class), anyDouble())).thenReturn(true);
+
+        assertTrue(adapter.createPlayerAccount(player));
+        assertTrue(adapter.createPlayerAccount(player, "world"));
+        verify(connector, times(2)).createAccountIfAbsent(player.getUniqueId(), 0.0);
+        verify(connector, never()).setPlayerBalance(any(UUID.class), anyDouble());
+    }
+
+    @Test
+    void accountCreationReportsAFailedInsert() {
+        when(connector.isEconomyWritable()).thenReturn(true);
+        when(connector.createAccountIfAbsent(any(UUID.class), anyDouble())).thenReturn(false);
+
+        assertFalse(adapter.createPlayerAccount(player));
+        verify(connector, never()).setPlayerBalance(any(UUID.class), anyDouble());
+    }
+
+    @Test
+    void nonFiniteAmountsAreRejectedBeforeAnyWrite() {
+        // NaN fails every comparison, so "amount < 0" let it through (#2124)
+        economyHealthy(100.0);
+        for (double bad : new double[] {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, -1.0}) {
+            assertEquals(EconomyResponse.ResponseType.FAILURE, adapter.depositPlayer(player, bad).type, "deposit " + bad);
+            assertEquals(EconomyResponse.ResponseType.FAILURE, adapter.withdrawPlayer(player, bad).type, "withdraw " + bad);
+        }
+        verify(connector, never()).changePlayerBalance(any(UUID.class), anyDouble());
     }
 
     @Test

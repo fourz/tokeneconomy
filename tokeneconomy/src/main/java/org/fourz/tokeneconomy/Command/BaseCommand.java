@@ -70,12 +70,25 @@ public abstract class BaseCommand implements CommandExecutor, TabCompleter {
         return result.get();
     }
 
-    // Common amount parsing
+    // Common amount parsing: add and pay need a positive amount
     protected Double parseAmount(CommandSender sender, String amountStr) {
+        return parseAmount(sender, amountStr, false);
+    }
+
+    /**
+     * @param allowZero true for an absolute set, where zero is a legitimate target balance
+     */
+    protected Double parseAmount(CommandSender sender, String amountStr, boolean allowZero) {
         try {
             double amount = Double.parseDouble(amountStr);
-            if (amount <= 0) {
-                sendError(sender, "Amount must be positive.");
+            // parseDouble accepts "NaN" and "Infinity", and NaN fails every comparison, so it passed
+            // the positive check and could be written into a balance
+            if (!Double.isFinite(amount)) {
+                sendError(sender, "Invalid amount. Please enter a valid number.");
+                return null;
+            }
+            if (allowZero ? amount < 0 : amount <= 0) {
+                sendError(sender, allowZero ? "Amount cannot be negative." : "Amount must be positive.");
                 return null;
             }
             return amount;
