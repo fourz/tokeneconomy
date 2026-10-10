@@ -85,6 +85,43 @@ storage:
 | `tokeneconomy.add` | Add to player balances | false |
 | `tokeneconomy.top` | View leaderboards | true |
 
+## PlaceholderAPI
+
+When [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) is installed and enabled, TokenEconomy registers the internal expansion `tokeneconomy` (no eCloud download). Without PlaceholderAPI the plugin enables normally and logs `PlaceholderAPI not enabled - %tokeneconomy_*% placeholders not registered.` (#2109)
+
+| Placeholder | Example | Notes |
+|-------------|---------|-------|
+| `%tokeneconomy_balance%` | `1234.5` | Raw number: at most 2 decimals, no grouping, no symbol |
+| `%tokeneconomy_balance_formatted%` | `1,234.5 Wizbucks` | Same text as `/balance`, without the colour code |
+| `%tokeneconomy_balance_symbol%` | `1,234.5W` | Same text as `/balance <player>`, without the colour code |
+| `%tokeneconomy_balance_short%` | `1.2k` | `999`, `1k`, `999.9k`, `3.4M`, `2B`, `1T`; truncates, never rounds up |
+| `%tokeneconomy_rank%` | `3` | Position in the cached top list; fallback when outside it |
+| `%tokeneconomy_currency%` | `Wizbuck` | `economy.currencyNameSingular` |
+| `%tokeneconomy_currency_plural%` | `Wizbucks` | `economy.currencyNamePlural` |
+| `%tokeneconomy_currency_symbol%` | `W` | `economy.currencySymbol` |
+| `%tokeneconomy_top_<n>_name%` | `FZBunny` | Name of leaderboard row `n` (1-based), same naming as `/eco top` |
+| `%tokeneconomy_top_<n>_uuid%` | `7f2123f3-...` | UUID of row `n` |
+| `%tokeneconomy_top_<n>_balance%` | `2069` | Also `_balance_formatted`, `_balance_symbol`, `_balance_short` |
+
+**What a placeholder returns when there is no value:**
+
+| Situation | Returns |
+|-----------|---------|
+| Economy database unavailable (refusing store) | `placeholders.unavailable` (default `-`) for every balance, rank and top key. Never `0`. |
+| Unknown key, no player (hologram), player not online on this server, balance not loaded yet, rank outside the top list, top row `n` past the end | `placeholders.fallback` (default empty) |
+
+**No database access on the placeholder thread.** Values come from an in-memory cache. The cache holds the online players' balances and the top `placeholders.topSize` rows. It is read on a background thread on join, after every balance change made on this server, after `/eco reload`, and every `placeholders.refreshSeconds`. Changes made on another server sharing the economy appear after the next refresh. A failed read keeps the previous value. `rank` and `top_*` update on the timer only.
+
+```yaml
+placeholders:
+  fallback: ''
+  unavailable: '-'
+  topSize: 100        # read at enable only
+  refreshSeconds: 30  # read at enable only
+```
+
+All four keys are optional: an existing `config.yml` without them uses these defaults.
+
 ## Storage Configuration
 
 ### SQLite (Default)
@@ -216,7 +253,7 @@ CompletableFuture<Boolean> result = economyService.deposit(playerUUID, 100.0);
 
 - **Minecraft Versions**: 1.21+
 - **Server Software**: Spigot, Paper, and forks
-- **Dependencies**: Vault (required), RVNKCore (optional)
+- **Dependencies**: Vault (required), RVNKCore (optional), PlaceholderAPI (optional)
 - **Java Version**: Java 17+
 
 ## Support & Contributing

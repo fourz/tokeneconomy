@@ -19,6 +19,16 @@ public interface DataStore {
     void saveDatabase();
     void closeDatabase();
     double getPlayerBalanceByUUID(UUID playerUUID);
+    /**
+     * The balance, or empty when it could not be read - unlike {@link #getPlayerBalanceByUUID},
+     * which answers 0 on a SQL error. The placeholder cache (#2109) needs the difference: caching
+     * that 0 would show a scoreboard a player who is broke when the read merely failed. A player
+     * with no row is a real 0.
+     */
+    default java.util.OptionalDouble findPlayerBalance(UUID playerUUID) {
+        if (!isStoreAvailable()) return java.util.OptionalDouble.empty();
+        return java.util.OptionalDouble.of(getPlayerBalanceByUUID(playerUUID));
+    }
     boolean changePlayerBalance(UUID playerUUID, double amount);
     void setPlayerBalance(UUID playerUUID, double balance);
     /**

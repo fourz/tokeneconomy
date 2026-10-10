@@ -13,6 +13,12 @@ public class DataConnector {
 
     private final Logger logger;
     private DataStore dataStore;
+    /**
+     * Told the UUID after every write that may have changed a balance, so the placeholder cache
+     * (#2109) can re-read it. Runs on the writer's thread and must not block; null when PlaceholderAPI
+     * is absent.
+     */
+    private volatile java.util.function.Consumer<UUID> balanceChangeListener;
 
     public DataConnector(Plugin plugin) {
         this.logger = plugin.getLogger();
@@ -56,17 +62,44 @@ public class DataConnector {
         return dataStore.getPlayerBalanceByUUID(playerUUID);
     }
 
+    /** See {@link DataStore#findPlayerBalance}: empty when the read failed, never a false 0. */
+    public java.util.OptionalDouble findPlayerBalance(UUID playerUUID) {
+        return dataStore.findPlayerBalance(playerUUID);
+    }
+
     public boolean changePlayerBalance(UUID playerUUID, double amount) {
-        return dataStore.changePlayerBalance(playerUUID, amount);
+        boolean changed = dataStore.changePlayerBalance(playerUUID, amount);
+        if (changed) notifyBalanceChanged(playerUUID);
+        return changed;
     }
 
     public void setPlayerBalance(UUID uuid, double balance) {
         dataStore.setPlayerBalance(uuid, balance);
+        // The refusing store returns normally without writing; re-reading then costs nothing wrong.
+        notifyBalanceChanged(uuid);
     }
 
     /** Insert-only account creation - see {@link DataStore#createAccountIfAbsent}. */
     public boolean createAccountIfAbsent(UUID uuid, double initialBalance) {
-        return dataStore.createAccountIfAbsent(uuid, initialBalance);
+        boolean exists = dataStore.createAccountIfAbsent(uuid, initialBalance);
+        if (exists) notifyBalanceChanged(uuid);
+        return exists;
+    }
+
+    /** Installs the {@link #balanceChangeListener}; null removes it. */
+    public void setBalanceChangeListener(java.util.function.Consumer<UUID> listener) {
+        this.balanceChangeListener = listener;
+    }
+
+    private void notifyBalanceChanged(UUID uuid) {
+        java.util.function.Consumer<UUID> listener = balanceChangeListener;
+        if (listener == null || uuid == null) return;
+        try {
+            listener.accept(uuid);
+        } catch (Throwable t) {
+            // A display cache must never fail a money write that already succeeded.
+            logger.fine("Balance change listener failed: " + t.getMessage());
+        }
     }
 
     public boolean playerExistsByUUID(UUID uuid) {
@@ -90,7 +123,7 @@ public class DataConnector {
         return display;
     }
 
-    static String displayName(BalanceEntry entry) {
+    public static String displayName(BalanceEntry entry) {
         if (entry.name() != null) return entry.name();
         try {
             String cached = org.bukkit.Bukkit.getOfflinePlayer(entry.uuid()).getName();

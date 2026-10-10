@@ -11,6 +11,8 @@ import org.fourz.tokeneconomy.Command.EconomyCommand;
 import org.fourz.tokeneconomy.Command.PayCommand;
 import org.fourz.tokeneconomy.Command.PlayerResolver;
 import org.fourz.tokeneconomy.Data.DataConnector;
+import org.fourz.tokeneconomy.Placeholder.PlaceholderSettings;
+import org.fourz.tokeneconomy.Placeholder.PlaceholderSupport;
 
 import net.milkbowl.vault.economy.Economy;
 
@@ -21,6 +23,9 @@ public class TokenEconomy extends JavaPlugin {
     private ConfigLoader configLoader;
     private DataConnector dataConnector;
     private TokenEconomyVaultAdapter vaultAdapter;
+    /** %tokeneconomy_*% expansion (#2109); null when PlaceholderAPI is absent. */
+    private PlaceholderSupport placeholders;
+    private volatile PlaceholderSettings placeholderSettings;
 
     @Override
     public void onEnable() {
@@ -59,6 +64,7 @@ public class TokenEconomy extends JavaPlugin {
 
             TokenEconomyAPI.init(this);
             registerEconomyService();
+            registerPlaceholders();
 
             getLogger().info("TokenEconomy successfully enabled!");
         } catch (Exception e) {
@@ -77,6 +83,7 @@ public class TokenEconomy extends JavaPlugin {
             getLogger().info("Disabling TokenEconomy...");
             // Before the pool closes, so no consumer can call into a closed connector
             unregisterEconomyService();
+            unregisterPlaceholders();
             if (dataConnector != null) {
                 // Save and close database
                 dataConnector.saveDatabase();
@@ -134,6 +141,33 @@ public class TokenEconomy extends JavaPlugin {
         } catch (Throwable ignored) {
             // RVNKCore classes absent: nothing was registered
         }
+    }
+
+    /**
+     * Registers %tokeneconomy_*% when PlaceholderAPI is enabled (#2109). PlaceholderAPI classes are
+     * reached only through PlaceholderRegistrar, after PlaceholderSupport's enabled check, so the
+     * plugin enables normally without it. A failure here costs the placeholders and nothing else.
+     */
+    private void registerPlaceholders() {
+        try {
+            placeholderSettings = PlaceholderSettings.from(getConfig(), configLoader);
+            placeholders = PlaceholderSupport.start(this, this::getDataConnector, () -> placeholderSettings,
+                    PlaceholderSettings.topSize(getConfig()), PlaceholderSettings.refreshSeconds(getConfig()));
+        } catch (Throwable t) {
+            placeholders = null;
+            getLogger().warning("PlaceholderAPI expansion failed to register ("
+                    + t.getClass().getSimpleName() + ": " + t.getMessage() + ") - the economy is unaffected.");
+        }
+    }
+
+    private void unregisterPlaceholders() {
+        if (placeholders == null) return;
+        try {
+            placeholders.stop();
+        } catch (Throwable t) {
+            getLogger().warning("Failed to stop the PlaceholderAPI expansion: " + t.getMessage());
+        }
+        placeholders = null;
     }
 
     private void registerCommands() {
@@ -256,6 +290,7 @@ public class TokenEconomy extends JavaPlugin {
 
             // Only now is the old layer safe to retire.
             this.dataConnector = replacement;
+            refreshPlaceholdersAfterReload(replacement);
             if (previous != null) {
                 try {
                     previous.saveDatabase();
@@ -288,6 +323,16 @@ public class TokenEconomy extends JavaPlugin {
             getLogger().warning("TokenEconomy reload rejected, keeping previous configuration: "
                     + e.getMessage());
             return ReloadResult.failed(e.getMessage());
+        }
+    }
+
+    /** New currency names and fallbacks take effect now; topSize/refreshSeconds need a restart. */
+    private void refreshPlaceholdersAfterReload(DataConnector replacement) {
+        try {
+            placeholderSettings = PlaceholderSettings.from(getConfig(), configLoader);
+            if (placeholders != null) placeholders.onConnectorReplaced(replacement);
+        } catch (Throwable t) {
+            getLogger().warning("Reload: placeholder cache not refreshed: " + t.getMessage());
         }
     }
 
