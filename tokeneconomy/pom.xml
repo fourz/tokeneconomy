@@ -5,7 +5,7 @@
     
     <groupId>org.fourz</groupId>
     <artifactId>tokeneconomy</artifactId>
-    <version>1.2.11</version>
+    <version>1.2.12</version>
     <packaging>jar</packaging>
     
     <name>TokenEconomy</name>
@@ -142,6 +142,8 @@
                 <version>3.13.0</version>
                 <configuration>
                     <release>${java.version}</release>
+                    <!-- Fresh javac per compilation: in-process reuse crashes testCompile on JDK 25 (#1929, #2274) -->
+                    <fork>true</fork>
                 </configuration>
             </plugin>
             <!-- Maven Jar Plugin -->

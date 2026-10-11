@@ -4,7 +4,7 @@ api-version: '26.1'
 description: This is a simple Bukkit Plugin
 author: fourz
 
-depends: [Vault]
+depend: [Vault]
 softdepend: [RVNKCore, PlaceholderAPI]
 
 main: org.fourz.tokeneconomy.TokenEconomy
