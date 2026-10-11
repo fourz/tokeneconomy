@@ -3,8 +3,12 @@ package org.fourz.tokeneconomy.Command;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.Server;
+import org.bukkit.entity.Player;
+import org.fourz.tokeneconomy.TokenEconomy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -14,6 +18,8 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.mock;
@@ -103,5 +109,34 @@ class PayCommandTest {
         assertEquals(PayCommand.Outcome.REFUND_FAILED,
                 PayCommand.transfer(economy, payer, payee, 50.0, logger).outcome());
         assertEquals(1, severe.get(), "money left the payer and reached nobody - an operator must see it");
+    }
+
+    /**
+     * #2287: in an outage the balance pre-read saw the store's neutral zero and answered
+     * "Insufficient funds" before the withdrawal could report the outage.
+     */
+    @Test
+    void anOutageIsReportedAsAnOutageNotAsInsufficientFunds() {
+        TokenEconomy plugin = mock(TokenEconomy.class);
+        Server server = mock(Server.class);
+        Player sender = mock(Player.class);
+        Player target = mock(Player.class);
+        when(plugin.getServer()).thenReturn(server);
+        when(server.getPlayer("Payee")).thenReturn(target);
+        when(sender.hasPermission(any(String.class))).thenReturn(true);
+        when(target.getName()).thenReturn("Payee");
+        when(plugin.getPlayerBalance(sender)).thenReturn(0.0); // UnavailableDataStore's neutral zero
+        when(plugin.getVaultAdapter()).thenReturn(economy);
+        when(plugin.getLogger()).thenReturn(logger);
+        when(economy.withdrawPlayer(sender, 50.0))
+                .thenReturn(refused("Economy is temporarily unavailable - the database is unreachable"));
+
+        new PayCommand(plugin, mock(PlayerResolver.class)).execute(sender, new String[] {"Payee", "50"});
+
+        ArgumentCaptor<String> sent = ArgumentCaptor.forClass(String.class);
+        verify(sender).sendMessage(sent.capture());
+        assertTrue(sent.getValue().contains("temporarily unavailable"), sent.getValue());
+        assertFalse(sent.getValue().contains("Insufficient funds"), sent.getValue());
+        verify(economy, never()).depositPlayer(any(OfflinePlayer.class), anyDouble());
     }
 }
