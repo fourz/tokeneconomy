@@ -1,16 +1,39 @@
 package org.fourz.tokeneconomy;
 
 // Standard imports for configuration handling
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
-import java.io.File;
+import org.bukkit.configuration.file.YamlConfiguration;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Reads config.yml into typed settings.
+ *
+ * <p>Two kinds exist. The <b>live</b> loader ({@link #ConfigLoader(TokenEconomy)}) reads through
+ * {@code plugin.getConfig()} and is what the running economy uses. A <b>candidate</b>
+ * ({@link #candidate(TokenEconomy)}) reads the file into its own detached configuration, so
+ * {@code /eco reload} can build and test a new economy without touching the live one. A rejected
+ * reload drops the candidate, and the live getters keep their values (#2124). An accepted reload
+ * commits the candidate with {@link #attachToPlugin()}.</p>
+ */
 public class ConfigLoader {
     // Core plugin reference and currency naming fields
     private final TokenEconomy plugin;
+    /** True for a candidate: reads and writes its own detached config, not plugin.getConfig(). */
+    private boolean detached;
+    private FileConfiguration config;
     private String currencyNameSingular;
     private String currencyNamePlural;
     private String currencySymbol;
     private String storageType;
+    private String sqliteTablePrefix;
     private String mysqlHost;
     private int mysqlPort;
     private String mysqlDatabase;
@@ -28,32 +51,64 @@ public class ConfigLoader {
     private String databaseMode; // "shared" or "standalone"
 
     public ConfigLoader(TokenEconomy plugin) {
-        this.plugin = plugin;
+        this(plugin, false);
     }
 
-    public void loadConfig() {
+    private ConfigLoader(TokenEconomy plugin, boolean detached) {
+        this.plugin = plugin;
+        this.detached = detached;
+    }
+
+    /** A loader for a reload candidate; see the class comment. Call {@link #loadConfig()} next. */
+    public static ConfigLoader candidate(TokenEconomy plugin) {
+        return new ConfigLoader(plugin, true);
+    }
+
+    private File configFile() {
+        return new File(plugin.getDataFolder(), "config.yml");
+    }
+
+    /**
+     * Reads config.yml. The live loader reloads {@code plugin.getConfig()}; a candidate parses the
+     * file into its own configuration and throws on a YAML error, where the live path would log it
+     * and carry on with an empty config (every setting at its default).
+     */
+    public void loadConfig() throws InvalidConfigurationException, IOException {
         // Ensures config file exists, creates default if missing
-        File configFile = new File(plugin.getDataFolder(), "config.yml");
+        File configFile = configFile();
         if (!configFile.exists()) {
             plugin.saveResource("config.yml", false);
         }
-        plugin.reloadConfig();
-        
+
+        if (detached) {
+            YamlConfiguration candidate = new YamlConfiguration();
+            candidate.load(configFile);
+            InputStream bundled = plugin.getResource("config.yml");
+            if (bundled != null) {
+                // Same defaults JavaPlugin.reloadConfig() installs
+                candidate.setDefaults(YamlConfiguration.loadConfiguration(
+                        new InputStreamReader(bundled, StandardCharsets.UTF_8)));
+            }
+            config = candidate;
+        } else {
+            plugin.reloadConfig();
+            config = plugin.getConfig();
+        }
+
         // Loads currency naming preferences from config
-        FileConfiguration config = plugin.getConfig();
         currencyNameSingular = config.getString("economy.currencyNameSingular", "Token");
         currencyNamePlural = config.getString("economy.currencyNamePlural", "Tokens");
         currencySymbol = config.getString("economy.currencySymbol", "[o]");
         
         storageType = config.getString("storage.type", "sqlite").toLowerCase();
+        sqliteTablePrefix = config.getString("storage.sqlite.tablePrefix", "");
         databaseMode = config.getString("database.mode", "standalone").toLowerCase();
         migrateFromMySQL = config.getBoolean("storage.migrate_from_mysql", false);
         migrateFromSQLite = config.getBoolean("storage.migrate_from_sqlite", false);
         migrationStatus = config.getString("storage.migration_status", "none");
         if (!migrationStatus.matches("none|in_progress|completed|failed")) {
             migrationStatus = "none";
-            config.set("storage.migration_status", "none");
-            plugin.saveConfig();
+            persist("storage.migration_status", "none");
         }
 
         // Always read the MySQL block, even when storage.type is not "mysql" (#1804).
@@ -89,9 +144,58 @@ public class ConfigLoader {
         }
     }
 
+    /**
+     * Problems that make this configuration unsafe to switch to, empty when there are none. Checked
+     * for a reload candidate only. An unknown {@code storage.type} used to fall through to SQLite,
+     * which on a shared economy is a silent local ledger (#2103).
+     */
+    public List<String> validate() {
+        List<String> problems = new ArrayList<>();
+        if (!storageType.matches("sqlite|mysql")) {
+            problems.add("storage.type must be sqlite or mysql, not '" + storageType + "'");
+        }
+        if (!databaseMode.matches("shared|standalone")) {
+            problems.add("database.mode must be shared or standalone, not '" + databaseMode + "'");
+        }
+        return problems;
+    }
+
+    /**
+     * Commits a reload candidate: re-reads {@code plugin.getConfig()} from the file this candidate
+     * was built from (and wrote migration state to), and makes this loader the live one. The typed
+     * values already validated are kept as they are.
+     */
+    public void attachToPlugin() {
+        if (!detached) return;
+        plugin.reloadConfig();
+        config = plugin.getConfig();
+        detached = false;
+    }
+
+    /**
+     * Sets one key and writes that key alone to config.yml (#2124).
+     *
+     * <p>{@code plugin.saveConfig()} writes the whole in-memory config. After a rejected reload that
+     * in-memory copy is deliberately the old one, so a whole-file save would overwrite the edits the
+     * operator just made. This re-reads the file, changes one key, and writes it back.</p>
+     */
+    public void persist(String path, Object value) {
+        if (config != null) config.set(path, value);
+        if (!detached) plugin.getConfig().set(path, value);
+        File file = configFile();
+        YamlConfiguration onDisk = new YamlConfiguration();
+        try {
+            if (file.exists()) onDisk.load(file);
+            onDisk.set(path, value);
+            onDisk.save(file);
+        } catch (IOException | InvalidConfigurationException e) {
+            plugin.getLogger().warning("Could not save " + path + " to config.yml: " + e.getMessage());
+        }
+    }
+
     // Retrieves localized messages from config with fallback
     public String getMessage(String path) {
-        return plugin.getConfig().getString("economy." + path, "Message not found: " + path);
+        return config.getString("economy." + path, "Message not found: " + path);
     }
 
     // Getter methods for currency naming properties
@@ -109,6 +213,11 @@ public class ConfigLoader {
 
     public String getStorageType() {
         return storageType;
+    }
+
+    /** Table prefix for the SQLite store ({@code storage.sqlite.tablePrefix}). */
+    public String getSQLiteTablePrefix() {
+        return sqliteTablePrefix;
     }
 
     public String getMySQLHost() {
@@ -188,8 +297,14 @@ public class ConfigLoader {
 
     public void setMigrationStatus(String status) {
         migrationStatus = status;
-        plugin.getConfig().set("storage.migration_status", status);
-        plugin.saveConfig();
+        persist("storage.migration_status", status);
+    }
+
+    /** Clears a {@code storage.migrate_from_*} flag after its migration completed. */
+    public void clearMigrationFlag(String path) {
+        if ("storage.migrate_from_mysql".equals(path)) migrateFromMySQL = false;
+        if ("storage.migrate_from_sqlite".equals(path)) migrateFromSQLite = false;
+        persist(path, false);
     }
 
     /**
@@ -206,8 +321,7 @@ public class ConfigLoader {
      */
     public void setStorageType(String type) {
         storageType = type == null ? "sqlite" : type.toLowerCase();
-        plugin.getConfig().set("storage.type", storageType);
-        plugin.saveConfig();
+        persist("storage.type", storageType);
     }
 
 }

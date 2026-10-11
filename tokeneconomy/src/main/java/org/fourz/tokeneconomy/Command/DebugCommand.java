@@ -102,9 +102,9 @@ public class DebugCommand extends BaseCommand {
 
         plugin.getLogger().setLevel(level);
 
-        // Update config for persistence (use same path as onEnable)
-        plugin.getConfig().set("general.logLevel", levelStr);
-        plugin.saveConfig();
+        // Update config for persistence (use same path as onEnable). One key only: a whole-file
+        // saveConfig() would overwrite config edits a rejected /eco reload left on disk (#2124).
+        plugin.getConfigLoader().persist("general.logLevel", levelStr);
 
         sender.sendMessage(ChatColor.GREEN + "Log level set to: " + ChatColor.WHITE + levelStr);
         sender.sendMessage(ChatColor.GRAY + "(Saved to config.yml)");

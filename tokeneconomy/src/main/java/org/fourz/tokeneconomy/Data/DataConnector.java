@@ -21,8 +21,15 @@ public class DataConnector {
     private volatile java.util.function.Consumer<UUID> balanceChangeListener;
 
     public DataConnector(Plugin plugin) {
+        this(plugin, ((TokenEconomy) plugin).getConfigLoader());
+    }
+
+    /**
+     * Builds the store described by {@code configLoader}. {@code /eco reload} passes a candidate
+     * config here, so the live config is untouched until the new connector is accepted (#2124).
+     */
+    public DataConnector(Plugin plugin, ConfigLoader configLoader) {
         this.logger = plugin.getLogger();
-        ConfigLoader configLoader = ((TokenEconomy) plugin).getConfigLoader();
         DataStoreFactory factory = new DataStoreFactory(plugin, configLoader);
         DataStoreMigrationService migrationService = new DataStoreMigrationService(plugin, configLoader, factory);
 
@@ -40,9 +47,47 @@ public class DataConnector {
             // (PR #6 review). Swap to the refusing store instead.
             logger.severe("Economy database setup failed (" + e.getMessage()
                     + ") - switching to the unavailable store; transactions will be refused.");
+            try {
+                dataStore.closeDatabase();   // release the failed store's pool before dropping it
+            } catch (RuntimeException closeError) {
+                logger.fine("Closing the failed store: " + closeError.getMessage());
+            }
             dataStore = new UnavailableDataStore(logger, "setup failed: " + e.getMessage());
             dataStore.setupDatabase();
         }
+    }
+
+    /** Wraps a store that already exists. For tests, and for callers that built the store. */
+    public static DataConnector forStore(Logger logger, DataStore store) {
+        return new DataConnector(logger, store);
+    }
+
+    private DataConnector(Logger logger, DataStore store) {
+        this.logger = logger;
+        this.dataStore = store;
+    }
+
+    /** Fixed id for {@link #probe()}: no player has it, so the read touches no real row. */
+    private static final UUID PROBE_ID = new UUID(0L, 0L);
+
+    /**
+     * Health check for a connector about to be swapped in by {@code /eco reload} (#2124): null when
+     * usable, otherwise the reason. Checks the store is not the refusing one, then runs a real read
+     * against the economy table. {@link #isEconomyWritable()} alone only says which store class was
+     * built, not that its database answers.
+     */
+    public String probe() {
+        if (!dataStore.isStoreAvailable()) {
+            return dataStore instanceof UnavailableDataStore u ? u.getReason() : "economy database unavailable";
+        }
+        try {
+            if (dataStore.findPlayerBalance(PROBE_ID).isEmpty()) {
+                return "a test read of the economy table failed";
+            }
+        } catch (RuntimeException e) {
+            return "a test read of the economy table failed: " + e.getMessage();
+        }
+        return null;
     }
 
     /** False while the economy is refusing writes - see {@link DataStore#isStoreAvailable()}. */

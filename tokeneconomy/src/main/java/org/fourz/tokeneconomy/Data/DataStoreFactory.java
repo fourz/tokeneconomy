@@ -48,7 +48,8 @@ public class DataStoreFactory {
                 return new MySQLDataStore(pool, configLoader, plugin);
             case "sqlite":
             default:
-                return new SQLiteDataStore(pool, new File(plugin.getDataFolder(), "database.db"), plugin);
+                return new SQLiteDataStore(pool, new File(plugin.getDataFolder(), "database.db"), plugin,
+                        configLoader.getSQLiteTablePrefix());
         }
     }
 

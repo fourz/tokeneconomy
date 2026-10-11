@@ -17,14 +17,23 @@ public class SQLiteDataStore extends AbstractDataStore {
     private final Plugin plugin;
     private final String ECONOMY_TABLE;
 
-    public SQLiteDataStore(PoolDelegate pool, File dbPath, Plugin plugin) {
-        super(plugin.getConfig().getString("storage.sqlite.tablePrefix", ""));
+    /**
+     * @param tablePrefix from the config this store is built for - a reload candidate's, not
+     *                    necessarily {@code plugin.getConfig()} (#2124)
+     */
+    public SQLiteDataStore(PoolDelegate pool, File dbPath, Plugin plugin, String tablePrefix) {
+        super(tablePrefix);
         this.pool = pool;
         this.plugin = plugin;
         this.logger = plugin.getLogger();
         this.ECONOMY_TABLE = table("economy");
     }
 
+    /**
+     * Creates the economy table. Throws on failure, as {@link MySQLDataStore} does: this used to log
+     * and return, so a store whose schema failed still reported itself available and
+     * {@code /eco reload} swapped it in over a working one (#2124).
+     */
     public void setupDatabase() {
         try {
             ensureDataFolderExists();
@@ -32,7 +41,7 @@ public class SQLiteDataStore extends AbstractDataStore {
             logger.info("SQLite database setup successful.");
         } catch (SQLException e) {
             logger.severe("SQLite database setup failed: " + e.getMessage());
-            e.printStackTrace();
+            throw new RuntimeException("Failed to setup SQLite database: " + e.getMessage(), e);
         }
     }
 
