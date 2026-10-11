@@ -26,10 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
@@ -49,6 +51,7 @@ class EconomyReloadTest {
     private TokenEconomy plugin;
     private ConfigLoader live;
     private DataConnector previous;
+    private YamlConfiguration liveYaml;
 
     private void writeConfig(String currency, String storage, String mode) throws Exception {
         Files.writeString(folder.resolve("config.yml"), String.join("\n",
@@ -79,8 +82,11 @@ class EconomyReloadTest {
 
         // The running economy: Wizbuck on shared MySQL
         writeConfig("Wizbuck", "mysql", "shared");
-        YamlConfiguration liveYaml = YamlConfiguration.loadConfiguration(folder.resolve("config.yml").toFile());
+        liveYaml = YamlConfiguration.loadConfiguration(folder.resolve("config.yml").toFile());
         doReturn(liveYaml).when(plugin).getConfig();
+        // JavaPlugin.saveConfig(): the whole in-memory config to config.yml
+        doAnswer(inv -> { liveYaml.save(folder.resolve("config.yml").toFile()); return null; })
+                .when(plugin).saveConfig();
         live = new ConfigLoader(plugin);
         live.loadConfig();
         previous = mock(DataConnector.class);
@@ -89,6 +95,8 @@ class EconomyReloadTest {
     }
 
     private void assertNothingChanged() {
+        assertSame(liveYaml, plugin.getConfig(), "the in-memory config is the pre-reload one");
+        verify(plugin, times(1)).reloadConfig();   // setUp's load only; never on a rejected reload
         assertSame(live, plugin.getConfigLoader());
         assertSame(previous, plugin.getDataConnector());
         assertEquals("Wizbuck", plugin.currencyNameSingular());
@@ -199,5 +207,23 @@ class EconomyReloadTest {
         assertEquals("Dollar", plugin.currencyNameSingular());
         assertEquals("sqlite", plugin.getConfigLoader().getStorageType());
         verify(previous).closeDatabase();
+    }
+
+    @Test
+    void wholeFileSaveAfterARejectedReloadWritesTheRunningConfig() throws Exception {
+        writeConfig("Rejected", "sqlite", "standalone");
+        doReturn(DataConnector.forStore(LOG, new UnavailableDataStore(LOG, "host down")))
+                .when(plugin).buildConnector(any());
+        assertFalse(plugin.reloadEconomy().isSuccess());
+
+        // The documented trade-off: a later save drops the rejected edits but leaves a valid,
+        // consistent file - the configuration that is actually running.
+        live.setMigrationStatus("none");
+
+        YamlConfiguration onDisk = new YamlConfiguration();
+        onDisk.load(folder.resolve("config.yml").toFile());
+        assertEquals("Wizbuck", onDisk.getString("economy.currencyNameSingular"));
+        assertEquals("mysql", onDisk.getString("storage.type"));
+        assertEquals("shared", onDisk.getString("database.mode"));
     }
 }

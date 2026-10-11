@@ -276,6 +276,7 @@ public class TokenEconomy extends JavaPlugin {
             if (!problems.isEmpty()) {
                 String reason = String.join("; ", problems);
                 getLogger().warning("TokenEconomy reload rejected, keeping previous configuration: " + reason);
+                warnUnappliedEdits();
                 return ReloadResult.failed("invalid configuration (" + reason + ")");
             }
 
@@ -291,6 +292,7 @@ public class TokenEconomy extends JavaPlugin {
                 closeRejected(replacement);
                 getLogger().warning("TokenEconomy reload rejected, keeping previous configuration: "
                         + unusable);
+                warnUnappliedEdits();
                 return ReloadResult.failed("new configuration cannot reach the economy database ("
                         + unusable + ")");
             }
@@ -338,8 +340,22 @@ public class TokenEconomy extends JavaPlugin {
             this.dataConnector = previous;
             getLogger().warning("TokenEconomy reload rejected, keeping previous configuration: "
                     + e.getMessage());
+            warnUnappliedEdits();
             return ReloadResult.failed(e.getMessage());
         }
+    }
+
+    /**
+     * After a rejected reload, plugin.getConfig() is still the pre-reload config: the candidate was
+     * read into its own object and reloadConfig() runs only on commit. Trade-off (#2124): the next
+     * whole-file config save (/eco debug loglevel, a migration status write) rewrites config.yml
+     * from that pre-reload config and drops the rejected edits; the file stays valid and consistent.
+     */
+    private void warnUnappliedEdits() {
+        getLogger().warning("config.yml holds edits that were NOT applied. The running economy uses the"
+                + " previous configuration. Fix the file and run /eco reload again; a later config save"
+                + " (for example /eco debug loglevel) rewrites config.yml from the running configuration"
+                + " and discards those edits.");
     }
 
     /** The reload candidate: config.yml read without touching the live config. Seam for tests. */

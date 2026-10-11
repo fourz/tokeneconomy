@@ -108,7 +108,8 @@ public class ConfigLoader {
         migrationStatus = config.getString("storage.migration_status", "none");
         if (!migrationStatus.matches("none|in_progress|completed|failed")) {
             migrationStatus = "none";
-            persist("storage.migration_status", "none");
+            target().set("storage.migration_status", "none");
+            save();
         }
 
         // Always read the MySQL block, even when storage.type is not "mysql" (#1804).
@@ -173,24 +174,28 @@ public class ConfigLoader {
     }
 
     /**
-     * Sets one key and writes that key alone to config.yml (#2124).
+     * Writes the whole config to config.yml, as before 1.2.12. The live loader uses
+     * {@code plugin.saveConfig()}. A reload candidate saves its own detached config the same way,
+     * so migration state written during a reload lands in the file the candidate was read from.
      *
-     * <p>{@code plugin.saveConfig()} writes the whole in-memory config. After a rejected reload that
-     * in-memory copy is deliberately the old one, so a whole-file save would overwrite the edits the
-     * operator just made. This re-reads the file, changes one key, and writes it back.</p>
+     * <p>Trade-off (#2124): after a rejected reload the live config is the pre-reload one, so the next
+     * whole-file save rewrites config.yml from it and drops the rejected, unapplied edits.</p>
      */
-    public void persist(String path, Object value) {
-        if (config != null) config.set(path, value);
-        if (!detached) plugin.getConfig().set(path, value);
-        File file = configFile();
-        YamlConfiguration onDisk = new YamlConfiguration();
-        try {
-            if (file.exists()) onDisk.load(file);
-            onDisk.set(path, value);
-            onDisk.save(file);
-        } catch (IOException | InvalidConfigurationException e) {
-            plugin.getLogger().warning("Could not save " + path + " to config.yml: " + e.getMessage());
+    private void save() {
+        if (!detached) {
+            plugin.saveConfig();
+            return;
         }
+        try {
+            config.save(configFile());
+        } catch (IOException e) {
+            plugin.getLogger().warning("Could not save config.yml: " + e.getMessage());
+        }
+    }
+
+    /** The config this loader writes to: its own when detached, otherwise the plugin's. */
+    private FileConfiguration target() {
+        return detached ? config : plugin.getConfig();
     }
 
     // Retrieves localized messages from config with fallback
@@ -297,14 +302,16 @@ public class ConfigLoader {
 
     public void setMigrationStatus(String status) {
         migrationStatus = status;
-        persist("storage.migration_status", status);
+        target().set("storage.migration_status", status);
+        save();
     }
 
     /** Clears a {@code storage.migrate_from_*} flag after its migration completed. */
     public void clearMigrationFlag(String path) {
         if ("storage.migrate_from_mysql".equals(path)) migrateFromMySQL = false;
         if ("storage.migrate_from_sqlite".equals(path)) migrateFromSQLite = false;
-        persist(path, false);
+        target().set(path, false);
+        save();
     }
 
     /**
@@ -321,7 +328,8 @@ public class ConfigLoader {
      */
     public void setStorageType(String type) {
         storageType = type == null ? "sqlite" : type.toLowerCase();
-        persist("storage.type", storageType);
+        target().set("storage.type", storageType);
+        save();
     }
 
 }

@@ -53,6 +53,11 @@ TokenEconomy is a modern, efficient Minecraft economy plugin built for Spigot/Pa
 - `/economy add <player> <amount>` - Give tokens to a player
 - `/economy set <player> <amount>` - Set a player's balance
 - `/economy debug` - View plugin diagnostic information
+- `/economy reload` - Re-read config.yml and rebuild the database layer without a restart
+
+#### Reloading
+
+`/eco reload` reads config.yml into a candidate and tests it first. It rejects an unknown `storage.type` or `database.mode`, a YAML syntax error, and a database that fails a test read. The new config and connector take effect together, and only on success. On a rejection the previous economy and config keep running, and the console warns that config.yml holds unapplied edits. Trade-off: the next whole-file config save (for example `/eco debug loglevel`) rewrites config.yml from the running config and discards those edits, so fix the file and reload before you change anything else.
 
 ### Configuration
 
