@@ -14,6 +14,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+import java.util.function.Consumer;
 
 
 public abstract class BaseCommand implements CommandExecutor, TabCompleter {
@@ -61,13 +64,57 @@ public abstract class BaseCommand implements CommandExecutor, TabCompleter {
         return target;
     }
 
-    protected UUID resolvePlayerUUID(CommandSender sender, String playerName) {
-        Optional<UUID> result = playerResolver.resolve(playerName);
-        if (result.isEmpty()) {
-            sendError(sender, "Player not found.");
-            return null;
+    /**
+     * Resolves {@code playerName}, then runs {@code then} with the UUID on the main thread (#2288).
+     *
+     * <p>An online player (or a lookup that has already answered) continues at once, in the same
+     * tick, exactly as before. An offline player is looked up in the RVNKCore roster, a database
+     * read: this method returns without waiting, and {@code then} is scheduled back onto the main
+     * thread when the roster answers. The old code waited up to 3 s for that read on the main
+     * thread and froze every tick. An unknown player answers "Player not found." either way.</p>
+     *
+     * <p>{@code then} always runs on the main thread, so it may touch Bukkit freely.</p>
+     */
+    protected void withResolvedPlayer(CommandSender sender, String playerName, Consumer<UUID> then) {
+        CompletableFuture<Optional<UUID>> lookup;
+        try {
+            lookup = playerResolver.resolve(playerName);
+        } catch (RuntimeException e) {
+            lookup = null;
         }
-        return result.get();
+        if (lookup == null) lookup = CompletableFuture.completedFuture(Optional.empty());
+
+        if (lookup.isDone()) {
+            continueWith(sender, completedValue(lookup), then);
+            return;
+        }
+        lookup.whenComplete((result, error) -> {
+            Optional<UUID> uuid = error == null && result != null ? result : Optional.empty();
+            // The scheduler refuses tasks from a disabled plugin; a command that outlived its
+            // plugin has nobody left to answer.
+            if (!plugin.isEnabled()) return;
+            try {
+                plugin.getServer().getScheduler().runTask(plugin, () -> continueWith(sender, uuid, then));
+            } catch (RuntimeException e) {
+                plugin.getLogger().fine("Dropped a player lookup result for '" + playerName
+                        + "': " + e.getMessage());
+            }
+        });
+    }
+
+    private void continueWith(CommandSender sender, Optional<UUID> uuid, Consumer<UUID> then) {
+        if (uuid.isEmpty()) {
+            sendError(sender, "Player not found.");
+            return;
+        }
+        then.accept(uuid.get());
+    }
+
+    /** The value of a future that is already done; never blocks. A failed lookup is "not found". */
+    private static Optional<UUID> completedValue(CompletableFuture<Optional<UUID>> done) {
+        if (done.state() != Future.State.SUCCESS) return Optional.empty();
+        Optional<UUID> value = done.resultNow();
+        return value != null ? value : Optional.empty();
     }
 
     // Common amount parsing: add and pay need a positive amount

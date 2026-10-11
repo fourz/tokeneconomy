@@ -6,8 +6,6 @@ import org.bukkit.entity.Player;
 import org.fourz.tokeneconomy.TokenEconomy;
 import org.fourz.tokeneconomy.Utility.CurrencyFormatter;
 
-import java.util.UUID;
-
 public class BalanceCommand extends BaseCommand {
     public BalanceCommand(TokenEconomy plugin, PlayerResolver playerResolver) {
         super(plugin, playerResolver);
@@ -33,12 +31,12 @@ public class BalanceCommand extends BaseCommand {
 
         if (!checkAnyPermission(sender, "balance.others", "balance.*", "admin")) return true;
 
-        UUID targetUUID = resolvePlayerUUID(sender, args[0]);
-        if (targetUUID == null) return true;
-
-        double balance = plugin.getDataConnector().getPlayerBalanceByUUID(targetUUID);
-        String formattedBalance = CurrencyFormatter.format(balance, plugin.currencySymbol());
-        sender.sendMessage(ChatColor.GREEN + args[0] + "'s balance: " + formattedBalance);
+        // Offline names resolve off the main thread; the rest runs back on it (#2288)
+        withResolvedPlayer(sender, args[0], targetUUID -> {
+            double balance = plugin.getDataConnector().getPlayerBalanceByUUID(targetUUID);
+            String formattedBalance = CurrencyFormatter.format(balance, plugin.currencySymbol());
+            sender.sendMessage(ChatColor.GREEN + args[0] + "'s balance: " + formattedBalance);
+        });
         return true;
     }
 }
