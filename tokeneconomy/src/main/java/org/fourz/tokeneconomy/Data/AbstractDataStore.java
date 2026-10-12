@@ -39,5 +39,20 @@ public abstract class AbstractDataStore implements DataStore {
         return 0.0;
     }
 
+    @Override
+    public java.util.OptionalDouble findPlayerBalance(UUID playerUUID) {
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(
+                "SELECT BALANCE FROM " + table("economy") + " WHERE UUID = ?")) {
+            stmt.setString(1, playerUUID.toString());
+            try (ResultSet rs = stmt.executeQuery()) {
+                return java.util.OptionalDouble.of(rs.next() ? rs.getDouble("BALANCE") : 0.0);
+            }
+        } catch (SQLException e) {
+            getLogger().warning("Failed to retrieve player balance: " + e.getMessage());
+            return java.util.OptionalDouble.empty();
+        }
+    }
+
     protected abstract Logger getLogger();
 }

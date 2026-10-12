@@ -32,25 +32,25 @@ public class DataStoreMigrationService {
         if (configLoader.shouldMigrateFromMySQL()) {
             if (migrationStatus.equals("completed")) {
                 logger.info("Migration from MySQL to SQLite already completed.");
-                plugin.getConfig().set("storage.migrate_from_mysql", false);
+                configLoader.clearMigrationFlag("storage.migrate_from_mysql");
                 configLoader.setStorageType("sqlite");
                 return "sqlite";
             }
             String result = performMigration("mysql", "sqlite", "storage.migrate_from_mysql");
             if (result != null) return result;
             migrationFailed = true;
-            storageType = "sqlite";
+            storageType = "mysql";   // the source: its rows are complete, the target's may not be (#2286)
         } else if (configLoader.shouldMigrateFromSQLite()) {
             if (migrationStatus.equals("completed")) {
                 logger.info("Migration from SQLite to MySQL already completed.");
-                plugin.getConfig().set("storage.migrate_from_sqlite", false);
+                configLoader.clearMigrationFlag("storage.migrate_from_sqlite");
                 configLoader.setStorageType("mysql");
                 return "mysql";
             }
             String result = performMigration("sqlite", "mysql", "storage.migrate_from_sqlite");
             if (result != null) return result;
             migrationFailed = true;
-            storageType = "sqlite";
+            storageType = "sqlite";   // the source
         }
 
         if (!migrationFailed) {
@@ -60,13 +60,22 @@ public class DataStoreMigrationService {
         return storageType;
     }
 
-    /** Returns the resulting storage type on success, null on failure. */
+    /**
+     * Returns the resulting storage type on success, null on failure.
+     *
+     * <p>On failure the <b>source</b> stays the active store, the migrate flag stays set so the next
+     * start retries, and the status is {@code failed}. The source still holds every balance; the
+     * target may hold only some of them. The old failure path always chose SQLite, which for a
+     * MySQL-to-SQLite run was the partial target (#2286).</p>
+     */
     private String performMigration(String fromType, String toType, String clearFlag) {
         logger.info("Starting migration from " + fromType + " to " + toType + ".");
         configLoader.setMigrationStatus("in_progress");
+        DataStore source = null;
+        DataStore target = null;
         try {
-            DataStore source = factory.create(fromType);
-            DataStore target = factory.create(toType);
+            source = factory.create(fromType);
+            target = factory.create(toType);
             String testStore = fromType.equals("mysql") ? fromType : toType;
             DataStore storeToTest = fromType.equals("mysql") ? source : target;
             if (!testConnection(storeToTest)) {
@@ -78,17 +87,30 @@ public class DataStoreMigrationService {
             source.closeDatabase();
             target.closeDatabase();
             configLoader.setMigrationStatus("completed");
-            plugin.getConfig().set(clearFlag, false);
+            configLoader.clearMigrationFlag(clearFlag);
             configLoader.setStorageType(toType);
             logger.info("Migration from " + fromType + " to " + toType + " completed successfully.");
             return toType;
         } catch (Exception e) {
             logger.severe("Migration failed: " + e.getMessage());
             e.printStackTrace();
+            closeQuietly(source);
+            closeQuietly(target);
             configLoader.setMigrationStatus("failed");
-            logger.info("Falling back to SQLite storage.");
-            configLoader.setStorageType("sqlite");
+            logger.severe("Keeping the source store (" + fromType + ") active. " + clearFlag
+                    + " stays set, so the next start or /eco reload retries the migration; rows already"
+                    + " copied are skipped, never overwritten.");
+            configLoader.setStorageType(fromType);
             return null;
+        }
+    }
+
+    private void closeQuietly(DataStore store) {
+        if (store == null) return;
+        try {
+            store.closeDatabase();
+        } catch (Exception e) {
+            logger.fine("Closing a migration store failed: " + e.getMessage());
         }
     }
 
@@ -102,7 +124,27 @@ public class DataStoreMigrationService {
             throw new SQLException("Failed to initialize target database - check connection parameters and permissions");
         }
 
-        copyMissingBalances(source.getAllPlayerBalances(), target);
+        CopyResult copied = copyMissingBalances(source.getAllPlayerBalances(), target);
+        if (copied.failed() > 0) {
+            // A partial copy is a failed migration. Completing it would switch to a store that lacks
+            // these players' balances and clear the flag, so nothing would retry (#2286).
+            throw new SQLException(copied.failed() + " of " + copied.total() + " balances failed to copy"
+                    + " (failed UUIDs: " + summarize(copied.failedKeys()) + ")");
+        }
+    }
+
+    /** Counts from one copy pass; {@code failedKeys} are the source keys that did not land. */
+    record CopyResult(int inserted, int skipped, int failed, java.util.List<String> failedKeys) {
+        int total() { return inserted + skipped + failed; }
+        int[] counts() { return new int[] {inserted, skipped, failed}; }
+    }
+
+    private static final int MAX_LISTED_FAILURES = 20;
+
+    private static String summarize(java.util.List<String> keys) {
+        if (keys.size() <= MAX_LISTED_FAILURES) return String.join(", ", keys);
+        return String.join(", ", keys.subList(0, MAX_LISTED_FAILURES))
+                + " and " + (keys.size() - MAX_LISTED_FAILURES) + " more - see the warnings above";
     }
 
     /**
@@ -110,13 +152,14 @@ public class DataStoreMigrationService {
      * upsert: the target is the shared table another server is writing, and a re-run replaced live
      * balances with the source's stale copy (#2124).
      *
-     * @return {inserted, skipped (already present), failed}
+     * @return inserted, skipped (already present), failed, and the keys that failed
      */
-    int[] copyMissingBalances(Map<String, Double> balances, DataStore target) {
+    CopyResult copyMissingBalances(Map<String, Double> balances, DataStore target) {
         int totalPlayers = balances.size();
         int inserted = 0;
         int skipped = 0;
         int failed = 0;
+        java.util.List<String> failedKeys = new java.util.ArrayList<>();
         logger.info("Starting data migration for " + totalPlayers + " players.");
 
         for (Map.Entry<String, Double> entry : balances.entrySet()) {
@@ -128,10 +171,12 @@ public class DataStoreMigrationService {
                     inserted++;
                 } else {
                     failed++;
+                    failedKeys.add(entry.getKey());
                     logger.warning("Failed to migrate player " + entry.getKey());
                 }
             } catch (Exception e) {
                 failed++;
+                failedKeys.add(entry.getKey());
                 logger.warning("Failed to migrate player " + entry.getKey() + ": " + e.getMessage());
             }
             int processed = inserted + skipped + failed;
@@ -145,7 +190,7 @@ public class DataStoreMigrationService {
         if (failed > 0) {
             logger.warning("Some player data failed to migrate. Check logs for details.");
         }
-        return new int[] {inserted, skipped, failed};
+        return new CopyResult(inserted, skipped, failed, failedKeys);
     }
 
     private boolean initializeStore(DataStore store) {

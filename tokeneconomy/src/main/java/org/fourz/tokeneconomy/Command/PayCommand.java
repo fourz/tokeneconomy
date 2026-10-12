@@ -43,10 +43,8 @@ public class PayCommand extends BaseCommand {
         Double amount = parseAmount(sender, args[1]);
         if (amount == null) return true;
 
-        if (plugin.getPlayerBalance(player) < amount) {
-            sendError(sender, "Insufficient funds.");
-            return true;
-        }
+        // No balance pre-read (#2287): in an outage it read the store's neutral zero and answered
+        // "Insufficient funds". The guarded withdrawal decides both sufficiency and availability.
 
         // Our own provider, not plugin.getEconomy(): that is whichever provider Vault ranks highest
         Economy economy = plugin.getVaultAdapter();

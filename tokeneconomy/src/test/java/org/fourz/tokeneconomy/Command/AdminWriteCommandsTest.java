@@ -10,6 +10,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,7 +38,7 @@ class AdminWriteCommandsTest {
         resolver = mock(PlayerResolver.class);
         when(plugin.getDataConnector()).thenReturn(connector);
         when(plugin.getServer()).thenReturn(mock(Server.class));
-        when(resolver.resolve("Steve")).thenReturn(Optional.of(target));
+        when(resolver.resolve("Steve")).thenReturn(CompletableFuture.completedFuture(Optional.of(target)));
     }
 
     private String lastMessage() {

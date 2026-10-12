@@ -20,6 +20,20 @@ economy:
   payCommandReceiveMessageSelf: "You cannot pay yourself."
   payCommandNoPermissionMessage: "{currencyName} are non-transferable between players."
 
+# PlaceholderAPI expansion %tokeneconomy_*% (#2109). Registered only when PlaceholderAPI is enabled.
+# Values come from an in-memory cache - a placeholder never queries the database.
+# Missing keys fall back to the defaults shown here, so an existing config.yml needs no edit.
+placeholders:
+  # Returned for an unknown placeholder, an offline/unknown player, or a balance not loaded yet
+  fallback: ''
+  # Returned while the economy database is unavailable - never 0, so a scoreboard does not
+  # imply the player is broke
+  unavailable: '-'
+  # Rows kept for %tokeneconomy_top_<n>_*% and %tokeneconomy_rank% (read at enable only)
+  topSize: 100
+  # Seconds between cache refreshes of online balances and the top list (read at enable only)
+  refreshSeconds: 30
+
 storage:
   type: sqlite
   migrate_from_mysql: false

@@ -4,10 +4,21 @@ import org.bukkit.Server;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
 public interface PlayerResolver {
-    Optional<UUID> resolve(String playerName);
+    /**
+     * Resolves a player name to a UUID without blocking the caller (#2288).
+     *
+     * <p>An online player answers with an already-completed future. An offline lookup goes to the
+     * RVNKCore roster, a database read, and completes later on another thread. Commands run on the
+     * main thread, so this method must never wait on that read. Use
+     * {@link BaseCommand#withResolvedPlayer} to continue a command from the result.</p>
+     *
+     * @return never null; completes with empty when the player is unknown or the lookup failed
+     */
+    CompletableFuture<Optional<UUID>> resolve(String playerName);
 
     /**
      * The RVNKCore-backed resolver when RVNKCore is enabled (offline players resolve through the

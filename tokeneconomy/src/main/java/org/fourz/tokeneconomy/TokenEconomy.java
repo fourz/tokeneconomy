@@ -11,6 +11,8 @@ import org.fourz.tokeneconomy.Command.EconomyCommand;
 import org.fourz.tokeneconomy.Command.PayCommand;
 import org.fourz.tokeneconomy.Command.PlayerResolver;
 import org.fourz.tokeneconomy.Data.DataConnector;
+import org.fourz.tokeneconomy.Placeholder.PlaceholderSettings;
+import org.fourz.tokeneconomy.Placeholder.PlaceholderSupport;
 
 import net.milkbowl.vault.economy.Economy;
 
@@ -18,9 +20,13 @@ import java.util.Map;
 import java.util.logging.Level;
 
 public class TokenEconomy extends JavaPlugin {
-    private ConfigLoader configLoader;
+    /** Swapped by {@link #reloadEconomy()} together with the connector; read from Vault threads. */
+    private volatile ConfigLoader configLoader;
     private DataConnector dataConnector;
     private TokenEconomyVaultAdapter vaultAdapter;
+    /** %tokeneconomy_*% expansion (#2109); null when PlaceholderAPI is absent. */
+    private PlaceholderSupport placeholders;
+    private volatile PlaceholderSettings placeholderSettings;
 
     @Override
     public void onEnable() {
@@ -59,6 +65,7 @@ public class TokenEconomy extends JavaPlugin {
 
             TokenEconomyAPI.init(this);
             registerEconomyService();
+            registerPlaceholders();
 
             getLogger().info("TokenEconomy successfully enabled!");
         } catch (Exception e) {
@@ -77,6 +84,7 @@ public class TokenEconomy extends JavaPlugin {
             getLogger().info("Disabling TokenEconomy...");
             // Before the pool closes, so no consumer can call into a closed connector
             unregisterEconomyService();
+            unregisterPlaceholders();
             if (dataConnector != null) {
                 // Save and close database
                 dataConnector.saveDatabase();
@@ -134,6 +142,33 @@ public class TokenEconomy extends JavaPlugin {
         } catch (Throwable ignored) {
             // RVNKCore classes absent: nothing was registered
         }
+    }
+
+    /**
+     * Registers %tokeneconomy_*% when PlaceholderAPI is enabled (#2109). PlaceholderAPI classes are
+     * reached only through PlaceholderRegistrar, after PlaceholderSupport's enabled check, so the
+     * plugin enables normally without it. A failure here costs the placeholders and nothing else.
+     */
+    private void registerPlaceholders() {
+        try {
+            placeholderSettings = PlaceholderSettings.from(getConfig(), configLoader);
+            placeholders = PlaceholderSupport.start(this, this::getDataConnector, () -> placeholderSettings,
+                    PlaceholderSettings.topSize(getConfig()), PlaceholderSettings.refreshSeconds(getConfig()));
+        } catch (Throwable t) {
+            placeholders = null;
+            getLogger().warning("PlaceholderAPI expansion failed to register ("
+                    + t.getClass().getSimpleName() + ": " + t.getMessage() + ") - the economy is unaffected.");
+        }
+    }
+
+    private void unregisterPlaceholders() {
+        if (placeholders == null) return;
+        try {
+            placeholders.stop();
+        } catch (Throwable t) {
+            getLogger().warning("Failed to stop the PlaceholderAPI expansion: " + t.getMessage());
+        }
+        placeholders = null;
     }
 
     private void registerCommands() {
@@ -220,42 +255,54 @@ public class TokenEconomy extends JavaPlugin {
     /**
      * Re-reads config.yml and swaps in a rebuilt database layer without a restart (#1798).
      *
-     * <p><b>Order is deliberate:</b> the replacement {@link DataConnector} is constructed and its schema
-     * verified <i>before</i> the incumbent is closed. A bad configuration therefore throws while the old
-     * connector is still serving, and we return a failure with the economy untouched. Closing first and
-     * rebuilding after would leave the server with no economy on any typo — unacceptable for the Vault
-     * provider that BarterShops and others transact through.</p>
+     * <p><b>Order is deliberate:</b> the new config is read into a <i>candidate</i> loader, the
+     * replacement {@link DataConnector} is built from it, its schema set up and a real read run
+     * against it - all before anything live changes. Only when every check passes are the config
+     * and the connector committed, together. A rejected reload leaves both untouched: the old
+     * connector keeps serving, and the currency names, mode and storage the getters and
+     * {@code /eco debug} report stay the old ones (#2124). Closing first and rebuilding after would
+     * leave the server with no economy on any typo - unacceptable for the Vault provider that
+     * BarterShops and others transact through.</p>
      *
      * @return the resulting topology on success, or the reason for rejection
      */
     public synchronized ReloadResult reloadEconomy() {
         DataConnector previous = this.dataConnector;
+        DataConnector replacement = null;
+        boolean committed = false;
         try {
-            configLoader.loadConfig();
+            ConfigLoader candidate = loadCandidateConfig();
+            java.util.List<String> problems = candidate.validate();
+            if (!problems.isEmpty()) {
+                String reason = String.join("; ", problems);
+                getLogger().warning("TokenEconomy reload rejected, keeping previous configuration: " + reason);
+                warnUnappliedEdits();
+                return ReloadResult.failed("invalid configuration (" + reason + ")");
+            }
 
-            DataConnector replacement = new DataConnector(this);
+            replacement = buildConnector(candidate);
             replacement.setupDatabase();
 
             // An unreachable database does not throw: the factory and setupDatabase() hand back the
-            // refusing store instead. Installing it would close a working pool and report success
-            // for an economy that now refuses everything (#2124).
-            if (!replacement.isEconomyWritable()) {
-                String reason = replacement.getDataStore() instanceof org.fourz.tokeneconomy.Data.UnavailableDataStore u
-                        ? u.getReason() : "economy database unavailable";
-                try {
-                    replacement.closeDatabase();
-                } catch (Exception closeError) {
-                    getLogger().warning("Reload: failed to close the rejected connection: "
-                            + closeError.getMessage());
-                }
+            // refusing store instead. And a store can be the right class while its database does not
+            // answer - a failed SQLite schema used to pass. Installing either would close a working
+            // pool and report success for an economy that refuses everything (#2124).
+            String unusable = replacement.probe();
+            if (unusable != null) {
+                closeRejected(replacement);
                 getLogger().warning("TokenEconomy reload rejected, keeping previous configuration: "
-                        + reason);
+                        + unusable);
+                warnUnappliedEdits();
                 return ReloadResult.failed("new configuration cannot reach the economy database ("
-                        + reason + ")");
+                        + unusable + ")");
             }
 
-            // Only now is the old layer safe to retire.
+            // Commit config and connector together. Only now is the old layer safe to retire.
+            candidate.attachToPlugin();
+            this.configLoader = candidate;
             this.dataConnector = replacement;
+            committed = true;
+            refreshPlaceholdersAfterReload(replacement);
             if (previous != null) {
                 try {
                     previous.saveDatabase();
@@ -266,15 +313,15 @@ public class TokenEconomy extends JavaPlugin {
                 }
             }
 
-            String mode = configLoader.getDatabaseMode();
-            String storage = configLoader.getStorageType();
+            String mode = candidate.getDatabaseMode();
+            String storage = candidate.getStorageType();
             // In shared mode the storage.mysql.* fields are unused, so reporting them would print a
             // misleading "localhost/null" instead of naming the pool actually in use.
             String target;
             if ("shared".equalsIgnoreCase(mode)) {
                 target = "RVNKCore shared pool";
             } else if ("mysql".equalsIgnoreCase(storage)) {
-                target = configLoader.getMySQLHost() + "/" + configLoader.getMySQLDatabase();
+                target = candidate.getMySQLHost() + "/" + candidate.getMySQLDatabase();
             } else {
                 target = "local file";
             }
@@ -283,11 +330,62 @@ public class TokenEconomy extends JavaPlugin {
             return ReloadResult.ok(mode, storage, target);
 
         } catch (Exception e) {
-            // Incumbent connector was never replaced, so the economy is still live.
+            if (committed) {
+                // Past the swap only logging remains; the new economy is live.
+                getLogger().warning("Reload: error after the new configuration took effect: " + e.getMessage());
+                return ReloadResult.ok(configLoader.getDatabaseMode(), configLoader.getStorageType(), "unknown");
+            }
+            // Nothing was committed, so the economy and its config are still the previous ones.
+            if (replacement != null) closeRejected(replacement);
             this.dataConnector = previous;
             getLogger().warning("TokenEconomy reload rejected, keeping previous configuration: "
                     + e.getMessage());
+            warnUnappliedEdits();
             return ReloadResult.failed(e.getMessage());
+        }
+    }
+
+    /**
+     * After a rejected reload, plugin.getConfig() is still the pre-reload config: the candidate was
+     * read into its own object and reloadConfig() runs only on commit. Trade-off (#2124): the next
+     * whole-file config save (/eco debug loglevel, a migration status write) rewrites config.yml
+     * from that pre-reload config and drops the rejected edits; the file stays valid and consistent.
+     */
+    private void warnUnappliedEdits() {
+        getLogger().warning("config.yml holds edits that were NOT applied. The running economy uses the"
+                + " previous configuration. Fix the file and run /eco reload again; a later config save"
+                + " (for example /eco debug loglevel) rewrites config.yml from the running configuration"
+                + " and discards those edits.");
+    }
+
+    /** The reload candidate: config.yml read without touching the live config. Seam for tests. */
+    ConfigLoader loadCandidateConfig() throws Exception {
+        ConfigLoader candidate = ConfigLoader.candidate(this);
+        candidate.loadConfig();
+        return candidate;
+    }
+
+    /** A connector for {@code config}, not yet set up. Seam for tests. */
+    DataConnector buildConnector(ConfigLoader config) {
+        return new DataConnector(this, config);
+    }
+
+    private void closeRejected(DataConnector rejected) {
+        try {
+            rejected.closeDatabase();
+        } catch (Exception closeError) {
+            getLogger().warning("Reload: failed to close the rejected connection: "
+                    + closeError.getMessage());
+        }
+    }
+
+    /** New currency names and fallbacks take effect now; topSize/refreshSeconds need a restart. */
+    private void refreshPlaceholdersAfterReload(DataConnector replacement) {
+        try {
+            placeholderSettings = PlaceholderSettings.from(getConfig(), configLoader);
+            if (placeholders != null) placeholders.onConnectorReplaced(replacement);
+        } catch (Throwable t) {
+            getLogger().warning("Reload: placeholder cache not refreshed: " + t.getMessage());
         }
     }
 

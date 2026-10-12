@@ -5,7 +5,7 @@
     
     <groupId>org.fourz</groupId>
     <artifactId>tokeneconomy</artifactId>
-    <version>1.2.10</version>
+    <version>1.2.13</version>
     <packaging>jar</packaging>
     
     <name>TokenEconomy</name>
@@ -42,6 +42,11 @@
             <id>griefprevention-repo</id>
             <url>https://repo.glaremasters.me/repository/public/</url>
         </repository>
+        <!-- PlaceholderAPI Repository (%tokeneconomy_*% expansion, #2109) -->
+        <repository>
+            <id>placeholderapi</id>
+            <url>https://repo.helpch.at/releases/</url>
+        </repository>
         <repository>
             <id>jitpack.io</id>
             <url>https://jitpack.io</url>
@@ -71,6 +76,16 @@
             <artifactId>GriefPrevention</artifactId>
             <version>16.18.2</version>
                 <scope>provided</scope>
+        </dependency>
+
+        <!-- Optional: PlaceholderAPI (%tokeneconomy_*% expansion, #2109). Soft dependency - its
+             classes are reached only through Placeholder/PlaceholderRegistrar after an enabled check. -->
+        <dependency>
+            <groupId>me.clip</groupId>
+            <artifactId>placeholderapi</artifactId>
+            <version>2.12.3</version>
+            <scope>provided</scope>
+            <optional>true</optional>
         </dependency>
 
         <!-- RVNKCore (shared pool mode + compile-time API) -->
@@ -127,6 +142,8 @@
                 <version>3.13.0</version>
                 <configuration>
                     <release>${java.version}</release>
+                    <!-- Fresh javac per compilation: in-process reuse crashes testCompile on JDK 25 (#1929, #2274) -->
+                    <fork>true</fork>
                 </configuration>
             </plugin>
             <!-- Maven Jar Plugin -->
