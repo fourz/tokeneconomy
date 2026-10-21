@@ -50,8 +50,12 @@ public class StandalonePoolDelegate implements PoolDelegate {
                 + "&tcpKeepAlive=true");
             cfg.setUsername(configLoader.getMySQLUsername());
             cfg.setPassword(configLoader.getMySQLPassword());
-            cfg.setMaximumPoolSize(10);
-            cfg.setMinimumIdle(2);
+            // Every pool on a server shares its MySQL user, and the Interserver host allows 45
+            // connections per user. Keep this pool small. One idle connection keeps balance reads
+            // fast; keepalive refreshes it before network gear drops the idle TCP link.
+            cfg.setMaximumPoolSize(configLoader.getMySQLPoolSize());
+            cfg.setMinimumIdle(1);
+            cfg.setKeepaliveTime(120_000L);
             cfg.setIdleTimeout(300_000L);
             cfg.setMaxLifetime(580_000L);
             cfg.setConnectionTimeout(configLoader.getMySQLConnectTimeoutMs());
