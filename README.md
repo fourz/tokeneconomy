@@ -2,6 +2,32 @@
 
 TokenEconomy is a modern, efficient Minecraft economy plugin built for Spigot/Paper servers. It provides a comprehensive token-based economy system with Vault integration, multiple storage backends, and a robust command interface.
 
+## Status
+
+| Server | Version (read 2026-11-01) |
+|--------|---------------------------|
+| RVNK Dev | 1.2.13 |
+| RVNK Event | 1.2.14 |
+| Ravenkraft (prod) | 1.2.13 |
+
+Versions drift between servers. Read the live one with `version TokenEconomy` on the server, or the built one in `tokeneconomy/pom.xml`.
+
+## Building
+
+- Compiler: JDK 25 (Temurin). Bytecode: Java 21 (`<release>21</release>`). API: `spigot-api` 26.1.2, `api-version: '26.1'`.
+- maven-compiler-plugin is pinned to 3.13.0 with `<fork>true</fork>`. Do not unpin it: newer versions crash `javac` on JDK 25 (#1929).
+- Bump the pom `<version>` on every deploy. Full rules: `.claude/rules/java-plugin-build.md` in the parent repo (`fourz/Ravenkaft-Dev`).
+
+```bash
+cd tokeneconomy
+mvn clean package -DskipTests
+# output: tokeneconomy/target/tokeneconomy.jar
+```
+
+## Source and mirrors
+
+GitHub (`fourz/tokeneconomy`) is origin. Push there. A read-only mirror is on the internal forge in org `ravenkraft` (path to be added).
+
 ## Features
 
 - **Multi-Storage Backend Support**
@@ -32,9 +58,9 @@ TokenEconomy is a modern, efficient Minecraft economy plugin built for Spigot/Pa
 
 ## Installation
 
-1. **Download** the latest release from the [Releases](https://github.com/fourz/tokeneconomy/releases) page
+1. **Build** `tokeneconomy.jar` (see Building)
 2. **Install Vault** - TokenEconomy requires Vault to function properly
-3. **Place** the `tokeneconomy-1.0-SNAPSHOT.jar` file into your server's `plugins/` folder
+3. **Place** the `tokeneconomy.jar` file into your server's `plugins/` folder
 4. **Restart** the server to generate configuration files
 5. **Configure** settings in `plugins/TokenEconomy/config.yml` as needed
 
@@ -176,20 +202,7 @@ boolean hasEnough = api.has(playerUUID, 25.0);
 
 ### Building from Source
 
-1. **Clone** the repository:
-
-```bash
-git clone https://github.com/fourz/tokeneconomy.git
-cd tokeneconomy
-```
-
-1. **Build** using Maven:
-
-```bash
-mvn clean package
-```
-
-The compiled JAR will be in `tokeneconomy/target/tokeneconomy-1.0-SNAPSHOT.jar`.
+See [Building](#building).
 
 ### Project Structure
 
