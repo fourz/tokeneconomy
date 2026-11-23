@@ -50,6 +50,9 @@ storage:
     connectionTimeout: 5000
     maxRetries: 3
     retryDelay: 2000
+    # standalone mode only: most connections the pool opens (1-10). The MySQL host allows 45
+    # connections per user, shared by every pool that logs in as that user.
+    poolSize: 3
   sqlite:
     database: data.db
     # Table prefix for shared database hosting (e.g., "token_" creates "token_economy")

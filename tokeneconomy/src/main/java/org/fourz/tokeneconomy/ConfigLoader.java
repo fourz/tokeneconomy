@@ -45,6 +45,7 @@ public class ConfigLoader {
     private int mysqlConnectionTimeout;
     private int mysqlMaxRetries;
     private int mysqlRetryDelay;
+    private int mysqlPoolSize;
     private boolean migrateFromMySQL;
     private boolean migrateFromSQLite;
     private String migrationStatus; // "none", "in_progress", "completed", "failed"
@@ -134,6 +135,7 @@ public class ConfigLoader {
         mysqlConnectionTimeout = config.getInt("storage.mysql.connectionTimeout", 5000);
         mysqlMaxRetries = config.getInt("storage.mysql.maxRetries", 3);
         mysqlRetryDelay = config.getInt("storage.mysql.retryDelay", 2000);
+        mysqlPoolSize = Math.max(1, Math.min(config.getInt("storage.mysql.poolSize", 3), 10));
 
         // Only announce the connection details when MySQL is actually going to be used — either as
         // the live store, or as the target of a pending migration.
@@ -278,6 +280,11 @@ public class ConfigLoader {
 
     public int getMySQLMaxRetries() {
         return mysqlMaxRetries;
+    }
+
+    /** {@code storage.mysql.poolSize}: most connections the standalone pool opens (1-10, default 3). */
+    public int getMySQLPoolSize() {
+        return mysqlPoolSize;
     }
 
     public int getMySQLRetryDelay() {
